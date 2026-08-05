@@ -1,0 +1,112 @@
+/*
+ * Project: shark-arts
+ * Repository: https://github.com/leaked32/shark-arts
+ *
+ * File: shark/include/shark/str.hpp
+ *
+ * License: MIT
+ */
+
+#pragma once
+
+#ifndef __cplusplus
+#error "This header requires C++"
+#endif
+
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "shark/common.hpp"
+
+
+namespace shark::file
+{
+class tlm_node
+{
+	// Touhou Little Marks
+
+  public:
+	void set_doc(
+		std::string_view content)
+	{
+		doc = std::make_unique<std::string>(content);
+	}
+
+	bool has_doc() const
+	{
+		return doc != nullptr;
+	}
+
+	std::optional<std::string_view> get_doc() const
+	{
+		return doc != nullptr ? std::optional<std::string_view>{*doc}
+							  : std::optional<std::string_view>{};
+	}
+
+	// std::string_view doesn't gaurantee null-terminate
+	tlm_node& get_child(
+		std::string_view key)
+	{
+		if (children == nullptr) {
+			children = std::make_unique<decltype(children)::element_type>();
+		}
+
+		auto p = children->try_emplace(std::string(key));
+		return p.first->second;
+	}
+
+	template <typename Ty>
+	tlm_node& operator[](
+		Ty&& key)
+	{
+		return get_child(std::forward<Ty>(key));
+	}
+
+	std::string print(unsigned short indent = 0) const;
+
+	std::optional<std::reference_wrapper<const std::map<std::string, tlm_node>>>
+	c_get_children() const
+	{
+		if (children) {
+			return *children;
+		}
+		return {};
+	}
+
+  private:
+	// lit::print("{}  {}", sizeof (std::map<std::string, tlm_node>), sizeof
+	// (std::unique_ptr<std::map<std::string, tlm_node>>));
+	std::unique_ptr<std::map<std::string, tlm_node>> children = nullptr;
+	std::unique_ptr<std::string> doc = nullptr;
+};
+
+std::string read(std::string_view path);
+std::vector<char> read_binary(const std::string& filename);
+tlm_node tlm_node_read(std::string_view path);
+//
+
+}; // namespace file
+
+namespace shark::str
+{
+	std::string replace(std::string_view input, std::string_view from, std::string_view to);
+	std::vector<std::string> split(std::string_view input, std::string_view delimiter);
+	std::optional<std::string> trim(const std::string& s);
+	unsigned short leading_space_count(const std::string& s);
+	bool is_empty_or_whitespace(const std::string& s);
+	void remove_whitespace(std::string& s);
+	size_t utf8_codepoints(std::string_view s);
+	size_t estimate_tokens(std::string_view s);
+	std::string to_lower(const std::string& s);
+	
+	
+	template <typename T>
+	std::tuple<T, T> from_interval_text(
+		std::string_view interval)
+	{
+		std::string intr = str::replace(interval, " ", "");
+	}
+} // namespace str
