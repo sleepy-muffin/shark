@@ -441,6 +441,10 @@ class multi_executor
 		job_type job)
 	{
 		std::scoped_lock lock(queue_mutex_);
+		
+		if (shutting_down_) {
+			return;
+		}
 		queue_.push(std::move(job));
 	}
 
@@ -470,7 +474,7 @@ class multi_executor
 				}
 			}
 			if (job) {
-				co_await job();
+				co_await job;
 			}
 			co_await timer.expires_after(std::chrono::milliseconds(100));
 		}
