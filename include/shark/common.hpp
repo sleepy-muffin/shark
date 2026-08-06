@@ -25,7 +25,7 @@
 #endif
 #endif
 
-constexpr bool LIT_DEBUG = true;
+constexpr bool SHARK_DEBUG = false;
 
 
 template <class>

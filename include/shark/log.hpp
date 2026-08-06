@@ -147,7 +147,7 @@ constexpr void debug(
 	const std::format_string<Types...>& Fmt, Types&&... Args)
 {
 	// print<"INFO: {}">(std::format(Fmt, std::forward<Types>(Args)...));
-	if constexpr (LIT_DEBUG) {
+	if constexpr (SHARK_DEBUG) {
 		std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
 		submit(message_type::DEBUG, info_str);
 	}

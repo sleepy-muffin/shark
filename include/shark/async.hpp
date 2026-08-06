@@ -22,8 +22,7 @@
 #include <thread>
 
 #include "shark/common.hpp"
-
-#include "shark/common.hpp"
+#include "shark/log.hpp"
 
 namespace shark::async
 {
@@ -256,7 +255,13 @@ struct io_context
 	std::vector<std::shared_ptr<strand>> context_;
 	// std::list<thread_slice> context_;
 	std::mutex mtx_context_;
-
+	std::atomic_bool shutting_down_ = false;
+	
+	void shutdown()
+	{
+		shutting_down_ = true;
+	}
+	
 	std::shared_ptr<strand> get_ready_coroutine()
 	{
 		std::scoped_lock mtx_context_lock(mtx_context_);
@@ -302,9 +307,8 @@ struct io_context
 	void run()
 	{
 		delayer local_delayer{};
-		while (!empty()) {
+		while ((!empty()) && (!shutting_down_)) {
 			local_delayer.reset();
-			// log::debug("local_delayer reset");
 
 			std::shared_ptr<strand> sit = get_ready_coroutine();
 			// Usually, if a thread is here, there should be something to execute.
@@ -316,9 +320,10 @@ struct io_context
 				std::this_thread::yield();
 				continue;
 			}
-
-			// log::debug("selected {}", sit->stacks());
-			// log::debug("mtx_context_lock unlock");
+			
+			if constexpr (SHARK_DEBUG) {
+				log::debug("selected {}", sit->stacks());
+			}
 			// If the condition is true, then the thread hasn't bound to
 			// any specific thread_slice currently.
 
@@ -328,7 +333,9 @@ struct io_context
 				}
 				// Coroutine can call others and emplace them to the stack in io_context,
 				// but it mustn't resume coroutines behind.
-				// log::debug("resuming {}", sit->stacks());
+				if constexpr (SHARK_DEBUG) {
+					log::debug("resuming {}", sit->stacks());
+				}
 				sit->addresses_.top().resume();
 
 				// The most efficient way for it:
@@ -359,10 +366,12 @@ struct io_context
 			sit->proceeding_ = false;
 			local_delayer.exec_delay();
 		}
-		// log::debug(
-		// 	"io_context::run has ended since no candidate async action is provided"
-		// 	"  I guess. it's something you expect"
-		// );
+		if constexpr (SHARK_DEBUG) {
+			log::debug(
+				"io_context::run has ended since no candidate async action is provided"
+				"  I guess. it's something you expect"
+			);
+		}
 	}
 };
 
@@ -414,7 +423,7 @@ template <typename Job>
 class multi_executor
 {
   public:
-	using job_type = std::function<Job>;
+	using job_type = Job;
 
 	multi_executor(
 		size_t thread_count)
@@ -448,7 +457,6 @@ class multi_executor
 	shark::async::awaitable<int> async_load(
 		int id)
 	{
-		// log::debug("Executing the job 0");
 		shark::async::deadline_timer timer;
 
 		while (!shutting_down_) {
@@ -461,14 +469,11 @@ class multi_executor
 					queue_.pop();
 				}
 			}
-			// log::debug("Executing the job 1");
 			if (job) {
-				// log::debug("Executing the job 2");
-				job();
+				co_await job();
 			}
 			co_await timer.expires_after(std::chrono::milliseconds(100));
 		}
-		// log::debug("Executing the job 2");
 		co_return 0;
 	}
 

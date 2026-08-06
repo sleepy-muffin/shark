@@ -1092,17 +1092,17 @@ double smoothstep(
 	return x * x * (3.0 - 2.0 * x);
 }
 
-struct SignalStats
+struct signal_stats
 {
 	double peak = 0.0;
 	double rms = 0.0;
 	double derivative_rms = 0.0;
 };
 
-SignalStats statistics(
+signal_stats statistics(
 	const std::vector<double>& x)
 {
-	SignalStats stats;
+	signal_stats stats;
 	if (x.empty()) {
 		return stats;
 	}
@@ -1200,8 +1200,8 @@ std::vector<double> shark::media::declick::reconstruct_gap_hybrid(
 	}
 
 	const auto context = nearby_context(signal, begin, end, config.context_frames);
-	const SignalStats context_stats = statistics(context);
-	const SignalStats lpc_stats = statistics(lpc);
+	const signal_stats context_stats = statistics(context);
+	const signal_stats lpc_stats = statistics(lpc);
 
 	const double peak_limit = std::max(0.08, context_stats.peak * 1.75);
 	const double rms_limit = std::max(0.025, context_stats.rms * 2.5);
@@ -1262,7 +1262,7 @@ shark::media::declick::event_kind merge_kind(
 	return a == b ? a : shark::media::declick::event_kind::mixed;
 }
 
-struct Candidate
+struct candidate
 {
 	std::size_t core_begin = 0;
 	std::size_t core_end = 0;
@@ -1272,7 +1272,7 @@ struct Candidate
 	double score = 0.0;
 };
 
-std::vector<Candidate> detect_channel(
+std::vector<candidate> detect_channel(
 	const std::vector<double>& signal, std::uint32_t sample_rate,
 	const shark::media::declick::options& config, std::size_t& clipped_seed_frames,
 	std::size_t& impulse_seed_frames)
@@ -1336,7 +1336,7 @@ std::vector<Candidate> detect_channel(
 	}
 
 	const std::size_t max_gap = ms_to_frames(config.merge_gap_ms, sample_rate);
-	std::vector<Candidate> candidates;
+	std::vector<candidate> candidates;
 	std::size_t i = 0;
 	while (i < n) {
 		while (i < n && seed[i] == 0) {
@@ -1371,7 +1371,7 @@ std::vector<Candidate> detect_channel(
 			++i;
 		}
 
-		Candidate candidate;
+		candidate candidate;
 		candidate.core_begin = begin;
 		candidate.core_end = end;
 		candidate.kind = has_clip && has_impulse ? shark::media::declick::event_kind::mixed
@@ -1402,7 +1402,7 @@ std::vector<Candidate> detect_channel(
 		}
 	}
 
-	std::vector<Candidate> merged;
+	std::vector<candidate> merged;
 	for (const auto& candidate : candidates) {
 		if (merged.empty() || candidate.repair_begin > merged.back().repair_end + 1) {
 			merged.push_back(candidate);

@@ -108,54 +108,6 @@ void shark::str::remove_whitespace(
 			s.end());
 }
 
-std::vector<std::string> shark::str::split(
-	std::string_view input, std::string_view delimiter)
-{
-	using T = decltype(input);
-
-	const size_t len_delimiter = delimiter.size();
-	size_t last_occur; // if the delimiter is on begin (0), no allocation is needed
-	size_t occur = 1; // if the delimiter is on begin (0), no allocation is needed
-	size_t pre_count = 0;
-	for (; occur = input.find(delimiter, occur), occur != T::npos;) {
-		last_occur = occur;
-		occur += len_delimiter + 1 /*the same reason*/;
-		pre_count += 1ul;
-	}
-	if (last_occur + len_delimiter < input.size() - 1) {
-		pre_count += 1;
-	}
-
-	if (pre_count == 0) {
-		throw pinch("nothing available");
-	}
-
-	std::vector<std::string> output;
-	output.reserve(pre_count);
-	// log::info("reserved: {} {}", pre_count, last_occur);
-
-	size_t it_last = 0;
-	size_t it_count = 0;
-	for (size_t it = 0; it = input.find(delimiter, it), it != T::npos;) {
-		// 1. Copy the buffer before the found substring to the output, the
-		// begin of the buffer should be last time, last_it = it + len_from
-		if (it_last != it) {
-			output.emplace_back(input.begin() + it_last, input.begin() + it);
-		}
-
-		it += len_delimiter;
-		it_last = it;
-
-		it_count += 1;
-	}
-	// 3. Copy the tail buffer
-	if (it_last != input.size()) {
-		output.emplace_back(input.begin() + it_last, input.end());
-	}
-
-	return output;
-}
-
 std::string shark::file::read(
 	std::string_view path)
 {
