@@ -423,7 +423,7 @@ template <typename Job>
 class multi_executor
 {
   public:
-	using job_type = Job;
+	using job_type = std::function<Job>;
 
 	multi_executor(
 		size_t thread_count)
@@ -474,7 +474,7 @@ class multi_executor
 				}
 			}
 			if (job) {
-				co_await job;
+				job();
 			}
 			co_await timer.expires_after(std::chrono::milliseconds(100));
 		}
