@@ -157,4 +157,11 @@ std::tuple<T, T> from_interval_text(
 {
 	std::string intr = str::replace(interval, " ", "");
 }
+
+void forcibly_print_string(const std::string& input);
+void forcibly_print_vector(const std::vector<std::string>& input);
+
+void indented_print(std::string_view s, char c = ' ', int n = 4);
+std::string indent(std::string_view s, char c = ' ', int n = 4);
+
 } // namespace shark::str

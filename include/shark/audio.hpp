@@ -228,5 +228,4 @@ repair_mode parse_repair_mode(const std::string& name);
 
 } // namespace declick
 
-std::string find_system_font(std::string_view name);
 } // namespace shark::media

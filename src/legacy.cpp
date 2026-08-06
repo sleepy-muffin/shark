@@ -9,52 +9,30 @@
 
 #include "shark/legacy.hpp"
 
-void shark::forcibly_print_vector(
-	const std::vector<std::string>& input)
-{
-	// std::cout << "\tdebug forcely_print_vector: ";
-	for (size_t i = 0; i < input.size(); ++i) {
-		// std::cout << i << ":";
-		forcibly_print_string(input.at(i));
-		std::cout << ", ";
-	}
-	// std::cout << std::endl;
-}
+#ifdef __linux__
 
-void shark::indented_print(
-	std::string_view s, char c, int n)
-{}
-
-std::string shark::indent(
-	std::string_view s, char c, int n)
+std::string shark::find_system_font(
+	std::string_view name)
 {
-	if (s.empty() || n <= 0)
-		return std::string(s);
-	std::string prefix(n, c);
-	std::string result;
-	result.reserve(s.size() + prefix.size() * 32); // safe overestimate
+	std::string command = "fc-match -f '%{file}' \"" + std::string(name) + "\"";
 	
-	size_t pos = 0;
-	while (pos < s.size()) {
-		size_t nl = s.find('\n', pos);
-		if (nl == std::string_view::npos) {
-			result += prefix;
-			result += s.substr(pos);
-			break;
-		}
-		result += prefix;
-		result += s.substr(pos, nl - pos + 1);
-		pos = nl + 1;
+	std::array<char, 256> buffer = {};
+	
+	std::string result;
+	
+	FILE* pipe = popen(command.c_str(), "r");
+	
+	if (!pipe) {
+		return {};
 	}
+	
+	while (fgets(buffer.data(), buffer.size(), pipe)) {
+		result += buffer.data();
+	}
+	
+	pclose(pipe);
+	
 	return result;
 }
 
-void shark::forcibly_print_string(
-	const std::string& input)
-{
-	// std::cout << "";
-	for (size_t i = 0; i < input.size(); ++i) {
-		std::cout << (char)(*(input.data() + i));
-	}
-	// std::cout << std::endl;
-}
+#endif

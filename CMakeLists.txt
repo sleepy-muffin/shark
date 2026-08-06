@@ -30,9 +30,8 @@ target_include_directories(${PROJECT_NAME}
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
-	Boost::headers Boost::json
 	JPEG::JPEG PNG::PNG
-	glfw OpenGL::GL
+	OpenGL::GL
 	${OPUSFILE_LIBRARY}
 	${OPUSENC_LIBRARY}
 )

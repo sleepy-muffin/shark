@@ -1640,31 +1640,3 @@ shark::media::declick::repair_mode shark::media::declick::parse_repair_mode(
 	}
 	throw std::invalid_argument("unknown repair mode: " + name);
 }
-
-#ifdef __linux__
-
-std::string shark::media::find_system_font(
-	std::string_view name)
-{
-	std::string command = "fc-match -f '%{file}' \"" + std::string(name) + "\"";
-
-	std::array<char, 256> buffer = {};
-
-	std::string result;
-
-	FILE* pipe = popen(command.c_str(), "r");
-
-	if (!pipe) {
-		return {};
-	}
-
-	while (fgets(buffer.data(), buffer.size(), pipe)) {
-		result += buffer.data();
-	}
-
-	pclose(pipe);
-
-	return result;
-}
-
-#endif

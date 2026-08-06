@@ -217,9 +217,5 @@ inline void assert(
 	assert(condition, "");
 }
 
-void indented_print(std::string_view s, char c = ' ', int n = 4);
-std::string indent(std::string_view s, char c = ' ', int n = 4);
-
-
 SHARK_END
 

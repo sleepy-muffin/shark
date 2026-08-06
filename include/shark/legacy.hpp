@@ -115,10 +115,6 @@ struct profiler
 	std::vector<duration> laps;
 };
 
-
-
-void forcibly_print_string(const std::string& input);
-void forcibly_print_vector(const std::vector<std::string>& input);
-
+std::string find_system_font(std::string_view name);
 
 SHARK_END
