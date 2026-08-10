@@ -136,6 +136,37 @@ class wav_writer
 	std::unique_ptr<state> state_;
 };
 
+// Sequential MP3 I/O. These keep only the caller's current block in memory.
+class mp3_reader
+{
+  public:
+	explicit mp3_reader(const std::filesystem::path& path);
+	~mp3_reader();
+	mp3_reader(const mp3_reader&) = delete;
+	mp3_reader& operator=(const mp3_reader&) = delete;
+	[[nodiscard]] const decoded_pcm& format() const;
+	[[nodiscard]] std::size_t total_frames() const;
+	[[nodiscard]] decoded_pcm read_frames(std::size_t maximum_frames);
+  private:
+	struct state;
+	std::unique_ptr<state> state_;
+};
+
+class mp3_writer
+{
+  public:
+	mp3_writer(const std::filesystem::path& path, const decoded_pcm& format,
+			   std::size_t bitrate = 192000);
+	~mp3_writer();
+	mp3_writer(const mp3_writer&) = delete;
+	mp3_writer& operator=(const mp3_writer&) = delete;
+	void write_frames(const decoded_pcm& audio);
+	void finish();
+  private:
+	struct state;
+	std::unique_ptr<state> state_;
+};
+
 decoded_pcm read_audio(const std::filesystem::path& path);
 void write_audio(const std::filesystem::path& path, const decoded_pcm& audio);
 

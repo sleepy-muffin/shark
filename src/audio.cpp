@@ -28,6 +28,10 @@
 #include <opusenc.h>
 #include <opusfile.h>
 
+#include <lame/lame.h>
+#include <mpg123.h>
+
+
 namespace
 {
 
@@ -893,6 +897,132 @@ void shark::media::opus_writer::finish()
 	}
 }
 
+struct shark::media::mp3_reader::state
+{
+	mpg123_handle* decoder = nullptr;
+	decoded_pcm format;
+	bool finished = false;
+};
+
+shark::media::mp3_reader::mp3_reader(const std::filesystem::path& path) :
+	state_(std::make_unique<state>())
+{
+	static const int initialized = [] { return mpg123_init(); }();
+	if (initialized != MPG123_OK) throw std::runtime_error("cannot initialize mpg123");
+	int error = MPG123_OK;
+	state_->decoder = mpg123_new(nullptr, &error);
+	if (!state_->decoder ||
+		mpg123_param(state_->decoder, MPG123_ADD_FLAGS, MPG123_FORCE_FLOAT, 0.0) != MPG123_OK ||
+		mpg123_open(state_->decoder, path.string().c_str()) != MPG123_OK)
+	{
+		if (state_->decoder) mpg123_delete(state_->decoder);
+		state_->decoder = nullptr;
+		throw std::runtime_error("cannot open MP3: " + path.string());
+	}
+	long rate = 0; int channels = 0; int encoding = 0;
+	if (mpg123_getformat(state_->decoder, &rate, &channels, &encoding) != MPG123_OK || rate <= 0 ||
+		(channels != 1 && channels != 2) || encoding != MPG123_ENC_FLOAT_32)
+	{
+		mpg123_close(state_->decoder);
+		mpg123_delete(state_->decoder);
+		state_->decoder = nullptr;
+		throw std::runtime_error("unsupported MP3 decoder output");
+	}
+	state_->format = {static_cast<std::uint32_t>(rate), static_cast<std::uint16_t>(channels),
+		sample_encoding::ieee_float, 32, 32, {}};
+}
+
+shark::media::mp3_reader::~mp3_reader()
+{
+	if (state_ && state_->decoder) {
+		mpg123_close(state_->decoder);
+		mpg123_delete(state_->decoder);
+	}
+}
+const shark::media::decoded_pcm& shark::media::mp3_reader::format() const { return state_->format; }
+std::size_t shark::media::mp3_reader::total_frames() const
+{
+	const off_t frames = mpg123_length(state_->decoder);
+	return frames > 0 ? static_cast<std::size_t>(frames) : 0;
+}
+shark::media::decoded_pcm shark::media::mp3_reader::read_frames(std::size_t maximum_frames)
+{
+	decoded_pcm result = state_->format;
+	if (maximum_frames == 0 || state_->finished) return result;
+	std::vector<float> buffer(maximum_frames * result.channels);
+	size_t bytes = 0;
+	const int status = mpg123_read(state_->decoder, reinterpret_cast<unsigned char*>(buffer.data()),
+		buffer.size() * sizeof(float), &bytes);
+	if (status != MPG123_OK && status != MPG123_DONE) throw std::runtime_error("failed while decoding MP3");
+	if (bytes % (sizeof(float) * result.channels) != 0)
+		throw std::runtime_error("MP3 decoder returned an incomplete PCM frame");
+	result.samples.assign(buffer.begin(), buffer.begin() + bytes / sizeof(float));
+	state_->finished = status == MPG123_DONE;
+	return result;
+}
+
+struct shark::media::mp3_writer::state
+{
+	lame_t encoder = nullptr;
+	std::uint32_t sample_rate = 0;
+	std::uint16_t channels = 0;
+	std::ofstream output;
+	bool finished = false;
+};
+shark::media::mp3_writer::mp3_writer(
+	const std::filesystem::path& path, const decoded_pcm& format, std::size_t bitrate) :
+	state_(std::make_unique<state>())
+{
+	if (format.sample_rate == 0 || (format.channels != 1 && format.channels != 2))
+		throw std::runtime_error("MP3 output requires mono or stereo audio");
+	if (bitrate < 8000 || bitrate > 320000 || bitrate % 1000 != 0)
+		throw std::invalid_argument("MP3 bitrate must be a whole number from 8 to 320 kbps");
+	state_->output.open(path, std::ios::binary);
+	state_->encoder = lame_init();
+	if (!state_->output || !state_->encoder ||
+		lame_set_in_samplerate(state_->encoder, static_cast<int>(format.sample_rate)) < 0 ||
+		lame_set_num_channels(state_->encoder, format.channels) < 0 ||
+		lame_set_brate(state_->encoder, static_cast<int>(bitrate / 1000)) < 0 ||
+		lame_init_params(state_->encoder) < 0)
+	{
+		if (state_->encoder) lame_close(state_->encoder);
+		state_->encoder = nullptr;
+		throw std::runtime_error("cannot initialize MP3 encoder");
+	}
+	state_->sample_rate = format.sample_rate;
+	state_->channels = format.channels;
+}
+shark::media::mp3_writer::~mp3_writer()
+{
+	try { finish(); } catch (...) {}
+	if (state_ && state_->encoder) lame_close(state_->encoder);
+}
+void shark::media::mp3_writer::write_frames(const decoded_pcm& audio)
+{
+	if (state_->finished || audio.sample_rate != state_->sample_rate ||
+		audio.channels != state_->channels || audio.frames() > static_cast<std::size_t>(
+			std::numeric_limits<int>::max()))
+		throw std::runtime_error("incompatible streamed MP3 block");
+	std::vector<float> pcm(audio.samples.begin(), audio.samples.end());
+	std::vector<unsigned char> encoded(static_cast<std::size_t>(1.25 * audio.frames()) + 7200);
+	const int bytes = lame_encode_buffer_interleaved_ieee_float(
+		state_->encoder, pcm.data(), static_cast<int>(audio.frames()), encoded.data(),
+		static_cast<int>(encoded.size()));
+	if (bytes < 0) throw std::runtime_error("failed while encoding MP3");
+	state_->output.write(reinterpret_cast<const char*>(encoded.data()), bytes);
+	if (!state_->output) throw std::runtime_error("failed while writing MP3");
+}
+void shark::media::mp3_writer::finish()
+{
+	if (!state_ || state_->finished) return;
+	std::array<unsigned char, 7200> encoded{};
+	const int bytes = lame_encode_flush(state_->encoder, encoded.data(), static_cast<int>(encoded.size()));
+	if (bytes < 0) throw std::runtime_error("failed while finalizing MP3");
+	state_->output.write(reinterpret_cast<const char*>(encoded.data()), bytes);
+	state_->output.close();
+	state_->finished = true;
+}
+
 shark::media::decoded_pcm shark::media::read_audio(
 	const std::filesystem::path& path)
 {
@@ -905,6 +1035,16 @@ shark::media::decoded_pcm shark::media::read_audio(
 		return read_wav(path);
 	}
 
+	if (ext == ".mp3" || ext == ".MP3") {
+		mp3_reader reader(path);
+		decoded_pcm audio = reader.format();
+		while (true) {
+			auto block = reader.read_frames(4096);
+			if (block.samples.empty()) break;
+			audio.samples.insert(audio.samples.end(), block.samples.begin(), block.samples.end());
+		}
+		return audio;
+	}
 	throw std::runtime_error("unsupported audio format: " + ext);
 }
 
@@ -919,6 +1059,12 @@ void shark::media::write_audio(
 	}
 	if (ext == ".wav" || ext == ".WAV") {
 		shark::media::write_wav(path, audio);
+		return;
+	}
+	if (ext == ".mp3" || ext == ".MP3") {
+		mp3_writer writer(path, audio);
+		writer.write_frames(audio);
+		writer.finish();
 		return;
 	}
 
