@@ -25,6 +25,7 @@ add_library(shark STATIC
 	src/image.cpp
 	src/legacy.cpp
 	src/str.cpp
+	src/termux.cpp
 )
 
 target_include_directories(${PROJECT_NAME}
