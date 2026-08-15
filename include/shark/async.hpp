@@ -250,18 +250,96 @@ struct awaitable
 #pragma endregion
 };
 
+template <>
+struct awaitable<void>
+{
+	struct promise_type;
+
+	using Handle_Type = std::coroutine_handle<promise_type>;
+	Handle_Type coro_handle_;
+
+	struct promise_type : promise_type_base
+	{
+		auto get_return_object()
+		{
+			return awaitable{Handle_Type::from_promise(*this)};
+		}
+
+		constexpr std::suspend_always initial_suspend()
+		{
+			return {};
+		}
+
+		constexpr std::suspend_always final_suspend() noexcept
+		{
+			return {};
+		}
+
+		void return_void() {}
+
+		void unhandled_exception()
+		{
+			try {
+				except_ = std::current_exception();
+				std::rethrow_exception(except_);
+			} catch (std::exception& exc) {
+				auto slice = slice_.lock();
+
+				if (slice) {
+					log::debug("slice: {}; current coroutine: {}; exception what: {}",
+							   (unsigned long)slice.get(),
+							   (unsigned long)slice->addresses_.top().address(), exc.what());
+				}
+			}
+			std::terminate();
+		}
+	};
+
+	void resume()
+	{
+		coro_handle_.resume();
+	}
+
+	~awaitable() {}
+
+	constexpr auto await_ready()
+	{
+		return false;
+	}
+
+	void await_suspend(
+		std::coroutine_handle<> parent_handle)
+	{
+		auto coro_handle =
+			std::coroutine_handle<promise_type_base>::from_address(parent_handle.address());
+
+		std::weak_ptr<strand> former_slice = coro_handle.promise().slice_;
+		coro_handle_.promise().slice_ = former_slice;
+
+		former_slice.lock()->addresses_.push(coro_handle_);
+
+		coro_handle_.resume();
+	}
+
+	void await_resume()
+	{
+		coro_handle_.destroy();
+		coro_handle_ = nullptr;
+	}
+};
+
 struct io_context
 {
 	std::vector<std::shared_ptr<strand>> context_;
 	// std::list<thread_slice> context_;
 	std::mutex mtx_context_;
 	std::atomic_bool shutting_down_ = false;
-	
+
 	void shutdown()
 	{
 		shutting_down_ = true;
 	}
-	
+
 	std::shared_ptr<strand> get_ready_coroutine()
 	{
 		std::scoped_lock mtx_context_lock(mtx_context_);
@@ -320,7 +398,7 @@ struct io_context
 				std::this_thread::yield();
 				continue;
 			}
-			
+
 			if constexpr (SHARK_DEBUG) {
 				log::debug("selected {}", sit->stacks());
 			}
@@ -367,10 +445,8 @@ struct io_context
 			local_delayer.exec_delay();
 		}
 		if constexpr (SHARK_DEBUG) {
-			log::debug(
-				"io_context::run has ended since no candidate async action is provided"
-				"  I guess. it's something you expect"
-			);
+			log::debug("io_context::run has ended since no candidate async action is provided"
+					   "  I guess. it's something you expect");
 		}
 	}
 };
@@ -441,7 +517,7 @@ class multi_executor
 		job_type job)
 	{
 		std::scoped_lock lock(queue_mutex_);
-		
+
 		if (shutting_down_) {
 			return;
 		}
