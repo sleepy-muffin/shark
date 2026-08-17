@@ -208,6 +208,7 @@ struct awaitable
 	{
 		coro_handle_.resume();
 	}
+
 	~awaitable()
 	{
 		// if(coro_handle_) {

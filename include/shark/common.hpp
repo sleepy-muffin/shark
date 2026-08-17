@@ -25,8 +25,11 @@
 #endif
 #endif
 
+#ifdef __SHARK_DEBUG__
+constexpr bool SHARK_DEBUG = true;
+#else
 constexpr bool SHARK_DEBUG = false;
-
+#endif
 
 template <class>
 struct function_traits;
