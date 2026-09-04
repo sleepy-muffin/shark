@@ -24,6 +24,7 @@ add_library(shark STATIC
 	src/external.cpp
 	src/image.cpp
 	src/legacy.cpp
+	src/json.cpp
 	src/str.cpp
 	src/termux.cpp
 )
