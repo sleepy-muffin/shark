@@ -1,6 +1,6 @@
 /*
- * Project: shark-arts
- * Repository: https://github.com/leaked32/shark-arts
+ * Project: shark
+ * Repository: https://github.com/leaked32/shark
  *
  * File: shark/src/image.cpp
  *
