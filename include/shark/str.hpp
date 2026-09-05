@@ -150,49 +150,39 @@ void indented_print(std::string_view s, char c = ' ', int n = 4);
 std::string indent(std::string_view s, char c = ' ', int n = 4);
 
 namespace toml {
-	using Table = std::unordered_map<std::string, std::string>;
+	class Toml {
+	public:
+		using Table = std::map<std::string, Toml>;
+		using Value = std::variant<std::monostate, bool, int64_t, double, std::string, Table>;
 
-	std::string trim(std::string s);
-	std::string unquote(const std::string& value, size_t line);
-	const std::string& raw(
-		const std::unordered_map<std::string, Table>& t, const std::string& section, const std::string& key
-		);
+		Toml() = default;
+		explicit Toml(Value value) : value_(std::move(value)) {}
 
-	int64_t integer(const auto& t, const std::string& s, const std::string& k) {
-		auto& v = raw(t, s, k);
-		int64_t out;
-		auto [p, ec] = std::from_chars(v.data(), v.data() + v.size(), out);
-		if (ec != std::errc{} || p != v.data() + v.size())
-			throw std::runtime_error("expected integer: " + s + "." + k);
-		return out;
-	}
+		bool is_table() const;
+		bool is_string() const;
+		bool is_integer() const;
+		bool is_real() const;
+		bool is_boolean() const;
 
-	double real(const auto& t, const std::string& s, const std::string& k) {
-		try {
-			size_t n;
-			auto x = std::stod(raw(t, s, k), &n);
-			if (n != raw(t, s, k).size())
-				throw 0;
-			return x;
-		} catch (...) { throw std::runtime_error("expected number: " + s + "." + k); }
-	}
+		const Toml& at(const std::string& key) const;
+		Toml& at(const std::string& key);
+		const Toml* find(const std::string& key) const;
+		Toml* find(const std::string& key);
 
-	bool boolean(const auto& t, const std::string& s, const std::string& k) {
-		auto& v = raw(t, s, k);
-		if (v == "true")
-			return true;
-		if (v == "false")
-			return false;
-		throw std::runtime_error("expected boolean: " + s + "." + k);
-	}
+		const Table& table() const;
+		Table& table();
+		const std::string& string() const;
+		int64_t integer() const;
+		double real() const;
+		bool boolean() const;
 
-	std::string string(const auto& t, const std::string& s, const std::string& k) {
-		return unquote(raw(t, s, k), 0);
-	}
+	private:
+		Value value_;
+	};
 
-	std::unordered_map<std::string, Table> parse_toml(const std::filesystem::path& path);
+	Toml parse(std::string_view text);
+	Toml parse_toml(const std::filesystem::path& path);
 }
-
 
 namespace json {
 	class Json {
