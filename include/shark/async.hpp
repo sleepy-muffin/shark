@@ -453,9 +453,13 @@ struct deadline_timer {
 template<typename T>
 concept ImpossibleType = !std::is_same_v<T, T>;
 
+template<typename>
+inline constexpr bool always_false_v = false;
+
 template<typename Job>
-	requires ImpossibleType<Job>
-class multi_executor {};
+class multi_executor {
+	static_assert(always_false_v<Job>, "multi_executor requires a function type");
+};
 
 template<typename Result>
 class multi_executor<Result()> {
