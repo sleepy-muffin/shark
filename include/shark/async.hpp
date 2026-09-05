@@ -24,20 +24,17 @@
 #include "shark/common.hpp"
 #include "shark/log.hpp"
 
-namespace shark::async
-{
+namespace shark::async {
 struct io_context;
 
-struct delayer
-{
+struct delayer {
 	std::chrono::system_clock::duration timer_;
-	void reset()
-	{
+
+	void reset() {
 		timer_ = std::chrono::seconds(2);
 	}
-	bool before(
-		std::chrono::system_clock::time_point end_point)
-	{
+
+	bool before(std::chrono::system_clock::time_point end_point) {
 		auto at_least = end_point - std::chrono::system_clock::now();
 		// std::chrono::system_clock::duration at_least =
 		//    end_point - std::chrono::system_clock::now();
@@ -45,16 +42,14 @@ struct delayer
 		if (at_least <= std::chrono::milliseconds(0)) {
 			timer_ = std::chrono::milliseconds(0);
 			return true;
-		}
-		else if (at_least < timer_) {
+		} else if (at_least < timer_) {
 			timer_ = at_least;
 			return false;
 		}
 		return false;
 	}
 
-	void exec_delay() const
-	{
+	void exec_delay() const {
 		if (timer_ == std::chrono::milliseconds(0)) {
 			// log::debug("local_delayer::exec_delay time's up");
 			return;
@@ -62,20 +57,18 @@ struct delayer
 		// log::debug("local_delayer::exec_delay delay");
 		std::this_thread::sleep_for(timer_);
 	}
-	void shorter(
-		std::chrono::system_clock::duration dura)
-	{}
+
+	void shorter(std::chrono::system_clock::duration dura) {
+	}
 };
 
 // task_context, thread slice
-class strand
-{
-  public:
+class strand {
+public:
 	io_context& parent_;
-	std::stack<std::coroutine_handle<>> addresses_;
+	std::stack<std::coroutine_handle<> > addresses_;
 
-	struct Condition
-	{
+	struct Condition {
 		virtual bool evaluate(delayer& local_delayer) = 0;
 		// Original virtual destructor is not allowed to be 0
 		virtual ~Condition() = default;
@@ -83,22 +76,18 @@ class strand
 
 	std::atomic_bool proceeding_ = false;
 
-	strand(
-		io_context& parent, std::coroutine_handle<> coro) : parent_(parent)
-	{
+	strand(io_context& parent, std::coroutine_handle<> coro) :
+		parent_(parent) {
 		addresses_.push(coro);
 	}
 
-	strand(
-		io_context& parent, strand&& obj) noexcept :
-		parent_(parent), addresses_(std::move(obj.addresses_)),
-		condition_(std::move(obj.condition_))
-	{
+	strand(io_context& parent, strand&& obj) noexcept :
+		parent_(parent), addresses_(std::move(obj.addresses_)), condition_(std::move(obj.condition_)) {
 		proceeding_ = static_cast<bool>(obj.proceeding_);
 	}
 
-	auto stacks() const -> std::string
-	{
+	auto stacks() const ->
+		std::string {
 		std::ostringstream ss;
 		ss << "[";
 
@@ -123,9 +112,7 @@ class strand
 		return ss.str();
 	}
 
-	bool evaluate_condition(
-		delayer& d)
-	{
+	bool evaluate_condition(delayer& d) {
 		std::scoped_lock lock(condition_mutex_);
 		if (!condition_) {
 			return true;
@@ -133,60 +120,50 @@ class strand
 		return condition_->evaluate(d);
 	}
 
-	void set_condition(
-		std::unique_ptr<Condition>&& condition)
-	{
+	void set_condition(std::unique_ptr<Condition>&& condition) {
 		std::scoped_lock lock(condition_mutex_);
 		condition_ = std::move(condition);
 	}
 
-  private:
+private:
 	std::unique_ptr<Condition> condition_ = nullptr;
 	std::mutex condition_mutex_;
 };
 
-struct promise_type_base
-{
+struct promise_type_base {
 	std::weak_ptr<strand> slice_;
 	std::exception_ptr except_ = nullptr;
 };
 
-template <typename Result>
-struct awaitable
-{
+template<typename Result>
+struct awaitable {
 	struct promise_type;
 
 	using Handle_Type = std::coroutine_handle<promise_type>;
 	Handle_Type coro_handle_;
 
-	struct promise_type : promise_type_base
-	{
+	struct promise_type : promise_type_base {
 		std::unique_ptr<Result> result_ = nullptr;
 
-		auto get_return_object()
-		{
+		auto get_return_object() {
 			return awaitable{Handle_Type::from_promise(*this)};
 		}
 
 		// I prefer not to mark them static
-		constexpr std::suspend_always initial_suspend()
-		{
-			return {};
-		}
-		constexpr std::suspend_always final_suspend() noexcept
-		{
+		constexpr std::suspend_always initial_suspend() {
 			return {};
 		}
 
-		template <typename... Types>
-		void return_value(
-			Types&&... args)
-		{
+		constexpr std::suspend_always final_suspend() noexcept {
+			return {};
+		}
+
+		template<typename... Types>
+		void return_value(Types&&... args) {
 			result_ = std::make_unique<Result>(std::forward<Types>(args)...);
 		}
 
-		void unhandled_exception()
-		{
+		void unhandled_exception() {
 			// I shall forward the exception, and terminate the thread.
 			try {
 				except_ = std::current_exception();
@@ -195,22 +172,21 @@ struct awaitable
 				auto slice = slice_.lock();
 
 				if (slice) {
-					log::debug("slice: {}; current coroutine: {}; exception what: {}",
-							   (unsigned long)slice.get(),
-							   (unsigned long)slice->addresses_.top().address(), exc.what());
+					log::debug(
+						"slice: {}; current coroutine: {}; exception what: {}", (unsigned long) slice.get(),
+						(unsigned long) slice->addresses_.top().address(), exc.what()
+					);
 				}
 			}
 			std::terminate();
 		}
 	};
 
-	void resume()
-	{
+	void resume() {
 		coro_handle_.resume();
 	}
 
-	~awaitable()
-	{
+	~awaitable() {
 		// if(coro_handle_) {
 		// 	coro_handle_.destroy();
 		// 	coro_handle_ = nullptr;
@@ -219,17 +195,14 @@ struct awaitable
 
 #pragma region Awaitable_Implementation
 
-	constexpr auto await_ready()
-	{
+	constexpr auto await_ready() {
 		return false;
 	}
-	void await_suspend(
-		std::coroutine_handle<> parent_handle)
-	{
+
+	void await_suspend(std::coroutine_handle<> parent_handle) {
 		// using casted_type = std::coroutine_handle<promise_type_base>;
 		// auto *p_parent_handle_base = reinterpret_cast<casted_type *>(&parent_handle);
-		auto coro_handle =
-			std::coroutine_handle<promise_type_base>::from_address(parent_handle.address());
+		auto coro_handle = std::coroutine_handle<promise_type_base>::from_address(parent_handle.address());
 
 		// auto slice = coro_handle.promise().slice_;
 		std::weak_ptr<strand> former_slice = coro_handle.promise().slice_;
@@ -240,8 +213,8 @@ struct awaitable
 		// since the stack has been pushed. But it will be much faster if I call it here.
 		coro_handle_.resume();
 	}
-	Result await_resume()
-	{
+
+	Result await_resume() {
 		Result result = std::move(*coro_handle_.promise().result_);
 		coro_handle_.destroy();
 		coro_handle_ = nullptr;
@@ -251,35 +224,30 @@ struct awaitable
 #pragma endregion
 };
 
-template <>
-struct awaitable<void>
-{
+template<>
+struct awaitable<void> {
 	struct promise_type;
 
 	using Handle_Type = std::coroutine_handle<promise_type>;
 	Handle_Type coro_handle_;
 
-	struct promise_type : promise_type_base
-	{
-		auto get_return_object()
-		{
+	struct promise_type : promise_type_base {
+		auto get_return_object() {
 			return awaitable{Handle_Type::from_promise(*this)};
 		}
 
-		constexpr std::suspend_always initial_suspend()
-		{
+		constexpr std::suspend_always initial_suspend() {
 			return {};
 		}
 
-		constexpr std::suspend_always final_suspend() noexcept
-		{
+		constexpr std::suspend_always final_suspend() noexcept {
 			return {};
 		}
 
-		void return_void() {}
+		void return_void() {
+		}
 
-		void unhandled_exception()
-		{
+		void unhandled_exception() {
 			try {
 				except_ = std::current_exception();
 				std::rethrow_exception(except_);
@@ -287,32 +255,29 @@ struct awaitable<void>
 				auto slice = slice_.lock();
 
 				if (slice) {
-					log::debug("slice: {}; current coroutine: {}; exception what: {}",
-							   (unsigned long)slice.get(),
-							   (unsigned long)slice->addresses_.top().address(), exc.what());
+					log::debug(
+						"slice: {}; current coroutine: {}; exception what: {}", (unsigned long) slice.get(),
+						(unsigned long) slice->addresses_.top().address(), exc.what()
+					);
 				}
 			}
 			std::terminate();
 		}
 	};
 
-	void resume()
-	{
+	void resume() {
 		coro_handle_.resume();
 	}
 
-	~awaitable() {}
+	~awaitable() {
+	}
 
-	constexpr auto await_ready()
-	{
+	constexpr auto await_ready() {
 		return false;
 	}
 
-	void await_suspend(
-		std::coroutine_handle<> parent_handle)
-	{
-		auto coro_handle =
-			std::coroutine_handle<promise_type_base>::from_address(parent_handle.address());
+	void await_suspend(std::coroutine_handle<> parent_handle) {
+		auto coro_handle = std::coroutine_handle<promise_type_base>::from_address(parent_handle.address());
 
 		std::weak_ptr<strand> former_slice = coro_handle.promise().slice_;
 		coro_handle_.promise().slice_ = former_slice;
@@ -322,30 +287,26 @@ struct awaitable<void>
 		coro_handle_.resume();
 	}
 
-	void await_resume()
-	{
+	void await_resume() {
 		coro_handle_.destroy();
 		coro_handle_ = nullptr;
 	}
 };
 
-struct io_context
-{
-	std::vector<std::shared_ptr<strand>> context_;
+struct io_context {
+	std::vector<std::shared_ptr<strand> > context_;
 	// std::list<thread_slice> context_;
 	std::mutex mtx_context_;
 	std::atomic_bool shutting_down_ = false;
 
-	void shutdown()
-	{
+	void shutdown() {
 		shutting_down_ = true;
 	}
 
-	std::shared_ptr<strand> get_ready_coroutine()
-	{
+	std::shared_ptr<strand> get_ready_coroutine() {
 		std::scoped_lock mtx_context_lock(mtx_context_);
 
-		using context_it = std::vector<std::shared_ptr<strand>>::iterator;
+		using context_it = std::vector<std::shared_ptr<strand> >::iterator;
 
 		for (context_it i = context_.begin(); i != context_.end(); ++i) {
 			// exchange will return the previous value,
@@ -358,18 +319,14 @@ struct io_context
 		return nullptr;
 	}
 
-	void erase_coroutine(
-		const std::shared_ptr<strand>& target)
-	{
+	void erase_coroutine(const std::shared_ptr<strand>& target) {
 		std::scoped_lock lock(mtx_context_);
 
 		std::erase_if(context_, [&](auto& x) { return x == target; });
 	}
 
-	template <typename TAsyncAwaitable>
-	void spawn(
-		TAsyncAwaitable&& coro)
-	{
+	template<typename TAsyncAwaitable>
+	void spawn(TAsyncAwaitable&& coro) {
 		std::scoped_lock mtx_context_lock(mtx_context_);
 
 		std::shared_ptr<strand> slice = std::make_shared<strand>(*this, coro.coro_handle_);
@@ -377,14 +334,12 @@ struct io_context
 		context_.emplace_back(std::move(slice));
 	}
 
-	bool empty()
-	{
+	bool empty() {
 		std::scoped_lock lock(mtx_context_);
 		return context_.empty();
 	}
 
-	void run()
-	{
+	void run() {
 		delayer local_delayer{};
 		while ((!empty()) && (!shutting_down_)) {
 			local_delayer.reset();
@@ -446,65 +401,68 @@ struct io_context
 			local_delayer.exec_delay();
 		}
 		if constexpr (SHARK_DEBUG) {
-			log::debug("io_context::run has ended since no candidate async action is provided"
-					   "  I guess. it's something you expect");
+			log::debug(
+				"io_context::run has ended since no candidate async action is provided"
+				"  I guess. it's something you expect"
+			);
 		}
 	}
 };
 
-struct deadline_timer
-{
+struct deadline_timer {
 	// Little struct does not necessarily need move constructor
-	struct deadline_timer_condition : strand::Condition
-	{
+	struct deadline_timer_condition : strand::Condition {
 		std::chrono::system_clock::time_point end_time_point_;
-		bool evaluate(
-			delayer& local_delayer) override
-		{
+
+		bool evaluate(delayer& local_delayer) override {
 			return local_delayer.before(end_time_point_);
 		}
+
 		~deadline_timer_condition() override = default;
-		deadline_timer_condition(
-			std::chrono::system_clock::time_point end_time_point) : end_time_point_(end_time_point)
-		{}
+
+		deadline_timer_condition(std::chrono::system_clock::time_point end_time_point) :
+			end_time_point_(end_time_point) {
+		}
 	};
 
-	struct deadline_timer_awaitable
-	{
+	struct deadline_timer_awaitable {
 		deadline_timer_condition condition_;
-		constexpr bool await_ready()
-		{
+
+		constexpr bool await_ready() {
 			return false;
 		}
-		void await_suspend(
-			std::coroutine_handle<> parent_handle)
-		{
-			auto parent_coro_handle =
-				std::coroutine_handle<promise_type_base>::from_address(parent_handle.address());
+
+		void await_suspend(std::coroutine_handle<> parent_handle) {
+			auto parent_coro_handle = std::coroutine_handle<promise_type_base>::from_address(parent_handle.address());
 
 			parent_coro_handle.promise().slice_.lock()->set_condition(
-				std::make_unique<deadline_timer_condition>(condition_));
+				std::make_unique<deadline_timer_condition>(condition_)
+			);
 		}
-		constexpr void await_resume() {}
+
+		constexpr void await_resume() {
+		}
 	};
 
-	auto expires_after(
-		std::chrono::system_clock::duration dura)
-	{
+	auto expires_after(std::chrono::system_clock::duration dura) {
 		return deadline_timer_awaitable{{std::chrono::system_clock::now() + dura}};
 		// NOTE: use steady_clock to trade performance for precision
 	}
 };
 
-template <typename Job>
-class multi_executor
-{
-  public:
-	using job_type = Job;
+template<typename T>
+concept ImpossibleType = !std::is_same_v<T, T>;
 
-	multi_executor(
-		size_t thread_count)
-	{
+template<typename Job>
+	requires ImpossibleType<Job>
+class multi_executor {};
+
+template<typename Result>
+class multi_executor<Result()> {
+	public:
+	using job_type = std::function<Result()>;
+
+	multi_executor(size_t thread_count) {
 		for (size_t i = 0; i < thread_count; ++i) {
 			ioc.spawn(async_load(i));
 		}
@@ -514,9 +472,7 @@ class multi_executor
 		}
 	}
 
-	void push(
-		job_type job)
-	{
+	void push(job_type job) {
 		std::scoped_lock lock(queue_mutex_);
 
 		if (shutting_down_) {
@@ -525,19 +481,18 @@ class multi_executor
 		queue_.push(std::move(job));
 	}
 
-	void shutdown()
-	{
+	void shutdown() {
 		shutting_down_ = true;
 
-		for (auto& thread : threads) {
-			thread.join();
+		for (auto& thread: threads) {
+			if (thread.joinable()) {
+				thread.join();
+			}
 		}
 	}
 
-  private:
-	shark::async::awaitable<int> async_load(
-		int id)
-	{
+	private:
+	shark::async::awaitable<int> async_load(int id) {
 		shark::async::deadline_timer timer;
 
 		while (!shutting_down_) {
@@ -550,11 +505,14 @@ class multi_executor
 					queue_.pop();
 				}
 			}
+
 			if (job) {
 				job();
 			}
+
 			co_await timer.expires_after(std::chrono::milliseconds(100));
 		}
+
 		co_return 0;
 	}
 
@@ -566,5 +524,6 @@ class multi_executor
 	shark::async::io_context ioc;
 	std::vector<std::thread> threads;
 };
+
 
 } // namespace shark::async
