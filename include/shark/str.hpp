@@ -149,68 +149,71 @@ void forcibly_print_vector(const std::vector<std::string>& input);
 void indented_print(std::string_view s, char c = ' ', int n = 4);
 std::string indent(std::string_view s, char c = ' ', int n = 4);
 
-namespace toml {
-	class Toml {
-	public:
-		using Table = std::map<std::string, Toml>;
-		using Value = std::variant<std::monostate, bool, int64_t, double, std::string, Table>;
+} // namespace shark::str
 
-		Toml() = default;
-		explicit Toml(Value value) : value_(std::move(value)) {}
 
-		bool is_table() const;
-		bool is_string() const;
-		bool is_integer() const;
-		bool is_real() const;
-		bool is_boolean() const;
 
-		const Toml& at(const std::string& key) const;
-		Toml& at(const std::string& key);
-		const Toml* find(const std::string& key) const;
-		Toml* find(const std::string& key);
+namespace shark::toml {
+class Toml {
+public:
+	using Table = std::map<std::string, Toml>;
+	using Value = std::variant<std::monostate, bool, int64_t, double, std::string, Table>;
 
-		const Table& table() const;
-		Table& table();
-		const std::string& string() const;
-		int64_t integer() const;
-		double real() const;
-		bool boolean() const;
+	Toml() = default;
+	explicit Toml(Value value) : value_(std::move(value)) {}
 
-	private:
-		Value value_;
-	};
+	bool is_table() const;
+	bool is_string() const;
+	bool is_integer() const;
+	bool is_real() const;
+	bool is_boolean() const;
 
-	Toml parse(std::string_view text);
-	Toml parse_toml(const std::filesystem::path& path);
+	const Toml& at(const std::string& key) const;
+	Toml& at(const std::string& key);
+	const Toml* find(const std::string& key) const;
+	Toml* find(const std::string& key);
+
+	const Table& table() const;
+	Table& table();
+	const std::string& string() const;
+	int64_t integer() const;
+	double real() const;
+	bool boolean() const;
+
+private:
+	Value value_;
+};
+
+Toml parse(std::string_view text);
+Toml parse_toml(const std::filesystem::path& path);
 }
 
-namespace json {
-	class Json {
-	public:
-		using Array = std::vector<Json>;
-		using Object = std::map<std::string, Json>;
-		using Value = std::variant<std::nullptr_t, bool, double, std::string, Array, Object>;
+namespace shark::json {
+class Json {
+public:
+	using Array = std::vector<Json>;
+	using Object = std::map<std::string, Json>;
+	using Value = std::variant<std::nullptr_t, bool, double, std::string, Array, Object>;
 
-		Json() :
-			value_(nullptr) {
-		}
+	Json() :
+		value_(nullptr) {
+	}
 
-		explicit Json(Value value) :
-			value_(std::move(value)) {
-		}
+	explicit Json(Value value) :
+		value_(std::move(value)) {
+	}
 
-		static Json parse(std::string_view text);
-		bool is_null() const;
-		bool is_string() const;
-		const std::string& string() const;
-		double number() const;
-		const Array& array() const;
-		const Object& object() const;
-		const Json& at(const std::string& key) const;
-		const Json* find(const std::string& key) const;
+	static Json parse(std::string_view text);
+	bool is_null() const;
+	bool is_string() const;
+	const std::string& string() const;
+	double number() const;
+	const Array& array() const;
+	const Object& object() const;
+	const Json& at(const std::string& key) const;
+	const Json* find(const std::string& key) const;
 
-	private:
-		Value value_;
-	};
+private:
+	Value value_;
+};
 } // namespace shark
-} // namespace shark::str
