@@ -19,6 +19,8 @@
 
 #if !defined(SHARK_FUNCTION)
 #if defined(_MSC_VER)
+
+#define SHARK_FUNCTION __FUNCTION__
 #elif defined(__GNUC__) || defined(__clang__)
 #define SHARK_FUNCTION __PRETTY_FUNCTION__
 #endif
@@ -69,4 +71,3 @@ private:
   }
 };
 }
-
