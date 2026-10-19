@@ -13,8 +13,6 @@
 #error "This header requires C++"
 #endif
 
-#include <vector>
-
 #define MMC_EXPORT
 
 #if !defined(SHARK_FUNCTION)
