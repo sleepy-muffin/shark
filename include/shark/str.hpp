@@ -26,7 +26,7 @@
 
 #include "shark/common.hpp"
 
-namespace shark::file {
+namespace mmc::file {
 class tlm_node {
 	// Touhou Little Marks
 
@@ -80,7 +80,7 @@ tlm_node tlm_node_read(std::string_view path);
 //
 }; // namespace shark::file
 
-namespace shark::str {
+namespace mmc::str {
 std::string replace(std::string_view input, std::string_view from, std::string_view to);
 
 inline std::vector<std::string> split(const std::string& text) {
@@ -153,7 +153,7 @@ std::string indent(std::string_view s, char c = ' ', int n = 4);
 
 
 
-namespace shark::toml {
+namespace mmc::toml {
 class Toml {
 public:
 	using Table = std::map<std::string, Toml>;
@@ -188,7 +188,7 @@ Toml parse(std::string_view text);
 Toml parse_toml(const std::filesystem::path& path);
 }
 
-namespace shark::json {
+namespace mmc::json {
 class Json {
 public:
 	using Array = std::vector<Json>;

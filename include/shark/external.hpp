@@ -16,7 +16,7 @@
 #include "shark/common.hpp"
 #include <boost/json.hpp>
 
-SHARK_BEGIN
+MMC_BEGIN
 namespace file
 {
 
@@ -24,4 +24,4 @@ boost::json::object read_json(std::string_view path);
 void dump_json(std::string_view path, const boost::json::object& js);
 } // namespace file
 
-SHARK_END
+MMC_END

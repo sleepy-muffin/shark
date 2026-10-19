@@ -16,7 +16,7 @@
 #include "shark/common.hpp"
 #include "shark/log.hpp"
 
-SHARK_BEGIN
+MMC_BEGIN
 
 // For specified error code
 template <auto F, auto N, typename... Types>
@@ -27,7 +27,7 @@ auto checked_invoke(
 	if (decltype(N)(result) != N) {
 		log::debug("Invocation of function has failed: {} {:#x}", SHARK_FUNCTION,
 				   decltype(N)(result));
-		throw pinch{"Invocation of function has failed"};
+		raise("Invocation of function has failed");
 	}
 	return result;
 }
@@ -117,4 +117,4 @@ struct profiler
 
 std::string find_system_font(std::string_view name);
 
-SHARK_END
+MMC_END

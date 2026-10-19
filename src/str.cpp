@@ -16,7 +16,7 @@
 #include <fstream>
 #include <sstream>
 
-std::string shark::str::replace(
+std::string mmc::str::replace(
 	std::string_view input, std::string_view from, std::string_view to)
 {
 	using T = decltype(input);
@@ -69,13 +69,13 @@ std::string shark::str::replace(
 	return output;
 }
 
-bool shark::str::is_empty_or_whitespace(
+bool mmc::str::is_empty_or_whitespace(
 	const std::string& s)
 {
 	return std::all_of(s.begin(), s.end(), [](unsigned char c) { return std::isspace(c); });
 }
 
-std::optional<std::string> shark::str::trim(
+std::optional<std::string> mmc::str::trim(
 	const std::string& s)
 {
 	if (std::all_of(s.begin(), s.end(), [](unsigned char c) { return std::isspace(c); })) {
@@ -94,7 +94,7 @@ std::optional<std::string> shark::str::trim(
 	return std::string(start, end);
 }
 
-unsigned short shark::str::leading_space_count(
+unsigned short mmc::str::leading_space_count(
 	const std::string& s)
 {
 	unsigned short count = 0;
@@ -104,27 +104,27 @@ unsigned short shark::str::leading_space_count(
 	return count;
 }
 
-void shark::str::remove_whitespace(
+void mmc::str::remove_whitespace(
 	std::string& s)
 {
 	s.erase(std::remove_if(s.begin(), s.end(), [](unsigned char c) { return std::isspace(c); }),
 			s.end());
 }
 
-std::string shark::file::read(
+std::string mmc::file::read(
 	std::string_view path)
 {
 	// Warning std::string_view is not null-terminated guaranteed.
 	std::ifstream file(std::string(path), std::ios::in | std::ios::binary);
 	if (!file.is_open()) {
-		shark::raise("Cannot open file: {}", path);
+		mmc::raise("Cannot open file: {}", path);
 	}
 
 	std::string str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 	return str;
 }
 
-std::vector<char> shark::file::read_binary(
+std::vector<char> mmc::file::read_binary(
 	const std::string& filename)
 {
 	std::ifstream file(filename, std::ios::ate | std::ios::binary);
@@ -137,11 +137,11 @@ std::vector<char> shark::file::read_binary(
 	return buffer;
 }
 
-shark::file::tlm_node shark::file::tlm_node_read(
+mmc::file::tlm_node mmc::file::tlm_node_read(
 	std::string_view file_path)
 {
 	const std::string identifier = "=^..^= ";
-	std::string ctx = shark::file::read(file_path);
+	std::string ctx = mmc::file::read(file_path);
 
 	decltype(ctx)::iterator ctx_begin = ctx.begin();
 
@@ -217,7 +217,7 @@ shark::file::tlm_node shark::file::tlm_node_read(
 	return node;
 }
 
-size_t shark::str::utf8_codepoints(
+size_t mmc::str::utf8_codepoints(
 	std::string_view s)
 {
 	size_t count = 0;
@@ -230,7 +230,7 @@ size_t shark::str::utf8_codepoints(
 	return count;
 }
 
-std::string shark::str::to_lower(
+std::string mmc::str::to_lower(
 	const std::string& s)
 {
 	std::string result = s;
@@ -239,7 +239,7 @@ std::string shark::str::to_lower(
 	return result;
 }
 
-size_t shark::str::estimate_tokens(
+size_t mmc::str::estimate_tokens(
 	std::string_view s)
 {
 	size_t ascii = 0;
@@ -255,7 +255,7 @@ size_t shark::str::estimate_tokens(
 	return (ascii + 3) / 4 + non_ascii_chars;
 }
 
-std::string shark::file::tlm_node::print(
+std::string mmc::file::tlm_node::print(
 	unsigned short indent) const
 {
 	std::ostringstream ss;
@@ -353,7 +353,7 @@ std::string shark::file::tlm_node::print(
 
 
 
-void shark::str::forcibly_print_vector(
+void mmc::str::forcibly_print_vector(
 	const std::vector<std::string>& input)
 {
 	// std::cout << "\tdebug forcely_print_vector: ";
@@ -364,7 +364,7 @@ void shark::str::forcibly_print_vector(
 	}
 	// std::cout << std::endl;
 }
-void shark::str::forcibly_print_string(
+void mmc::str::forcibly_print_string(
 	const std::string& input)
 {
 	// std::cout << "";
@@ -375,11 +375,11 @@ void shark::str::forcibly_print_string(
 }
 
 
-void shark::str::indented_print(
+void mmc::str::indented_print(
 	std::string_view s, char c, int n)
 {}
 
-std::string shark::str::indent(
+std::string mmc::str::indent(
 	std::string_view s, char c, int n)
 {
 	if (s.empty() || n <= 0)
@@ -435,8 +435,8 @@ std::string toml_unquote(const std::string& value, size_t line) {
 	return out;
 }
 
-shark::toml::Toml parse_toml_scalar(const std::string& value, size_t line) {
-	using Toml = shark::toml::Toml;
+mmc::toml::Toml parse_toml_scalar(const std::string& value, size_t line) {
+	using Toml = mmc::toml::Toml;
 	if (value.empty())
 		throw std::runtime_error("TOML line " + std::to_string(line) + ": empty value");
 	if (value.front() == '"')
@@ -461,21 +461,21 @@ shark::toml::Toml parse_toml_scalar(const std::string& value, size_t line) {
 	throw std::runtime_error("TOML line " + std::to_string(line) + ": unsupported value");
 }
 
-shark::toml::Toml::Table& ensure_toml_table(shark::toml::Toml& node) {
+mmc::toml::Toml::Table& ensure_toml_table(mmc::toml::Toml& node) {
 	if (!node.is_table())
-		node = shark::toml::Toml(shark::toml::Toml::Table{});
+		node = mmc::toml::Toml(mmc::toml::Toml::Table{});
 	return node.table();
 }
 
 } // namespace
 
-bool shark::toml::Toml::is_table() const { return std::holds_alternative<Table>(value_); }
-bool shark::toml::Toml::is_string() const { return std::holds_alternative<std::string>(value_); }
-bool shark::toml::Toml::is_integer() const { return std::holds_alternative<int64_t>(value_); }
-bool shark::toml::Toml::is_real() const { return std::holds_alternative<double>(value_); }
-bool shark::toml::Toml::is_boolean() const { return std::holds_alternative<bool>(value_); }
+bool mmc::toml::Toml::is_table() const { return std::holds_alternative<Table>(value_); }
+bool mmc::toml::Toml::is_string() const { return std::holds_alternative<std::string>(value_); }
+bool mmc::toml::Toml::is_integer() const { return std::holds_alternative<int64_t>(value_); }
+bool mmc::toml::Toml::is_real() const { return std::holds_alternative<double>(value_); }
+bool mmc::toml::Toml::is_boolean() const { return std::holds_alternative<bool>(value_); }
 
-const shark::toml::Toml& shark::toml::Toml::at(const std::string& key) const {
+const mmc::toml::Toml& mmc::toml::Toml::at(const std::string& key) const {
 	const auto& t = table();
 	auto it = t.find(key);
 	if (it == t.end())
@@ -483,7 +483,7 @@ const shark::toml::Toml& shark::toml::Toml::at(const std::string& key) const {
 	return it->second;
 }
 
-shark::toml::Toml& shark::toml::Toml::at(const std::string& key) {
+mmc::toml::Toml& mmc::toml::Toml::at(const std::string& key) {
 	auto& t = table();
 	auto it = t.find(key);
 	if (it == t.end())
@@ -491,7 +491,7 @@ shark::toml::Toml& shark::toml::Toml::at(const std::string& key) {
 	return it->second;
 }
 
-const shark::toml::Toml* shark::toml::Toml::find(const std::string& key) const {
+const mmc::toml::Toml* mmc::toml::Toml::find(const std::string& key) const {
 	if (!is_table())
 		return nullptr;
 	const auto& t = std::get<Table>(value_);
@@ -499,7 +499,7 @@ const shark::toml::Toml* shark::toml::Toml::find(const std::string& key) const {
 	return it == t.end() ? nullptr : &it->second;
 }
 
-shark::toml::Toml* shark::toml::Toml::find(const std::string& key) {
+mmc::toml::Toml* mmc::toml::Toml::find(const std::string& key) {
 	if (!is_table())
 		return nullptr;
 	auto& t = std::get<Table>(value_);
@@ -507,31 +507,31 @@ shark::toml::Toml* shark::toml::Toml::find(const std::string& key) {
 	return it == t.end() ? nullptr : &it->second;
 }
 
-const shark::toml::Toml::Table& shark::toml::Toml::table() const {
+const mmc::toml::Toml::Table& mmc::toml::Toml::table() const {
 	if (!is_table())
 		throw std::runtime_error("expected TOML table");
 	return std::get<Table>(value_);
 }
 
-shark::toml::Toml::Table& shark::toml::Toml::table() {
+mmc::toml::Toml::Table& mmc::toml::Toml::table() {
 	if (!is_table())
 		throw std::runtime_error("expected TOML table");
 	return std::get<Table>(value_);
 }
 
-const std::string& shark::toml::Toml::string() const {
+const std::string& mmc::toml::Toml::string() const {
 	if (!is_string())
 		throw std::runtime_error("expected TOML string");
 	return std::get<std::string>(value_);
 }
 
-int64_t shark::toml::Toml::integer() const {
+int64_t mmc::toml::Toml::integer() const {
 	if (!is_integer())
 		throw std::runtime_error("expected TOML integer");
 	return std::get<int64_t>(value_);
 }
 
-double shark::toml::Toml::real() const {
+double mmc::toml::Toml::real() const {
 	if (is_real())
 		return std::get<double>(value_);
 	if (is_integer())
@@ -539,13 +539,13 @@ double shark::toml::Toml::real() const {
 	throw std::runtime_error("expected TOML number");
 }
 
-bool shark::toml::Toml::boolean() const {
+bool mmc::toml::Toml::boolean() const {
 	if (!is_boolean())
 		throw std::runtime_error("expected TOML boolean");
 	return std::get<bool>(value_);
 }
 
-shark::toml::Toml shark::toml::parse(std::string_view text) {
+mmc::toml::Toml mmc::toml::parse(std::string_view text) {
 	Toml root(Toml::Table{});
 	Toml* current = &root;
 	std::istringstream in{std::string(text)};
@@ -605,7 +605,7 @@ shark::toml::Toml shark::toml::parse(std::string_view text) {
 	return root;
 }
 
-shark::toml::Toml shark::toml::parse_toml(const std::filesystem::path& path) {
+mmc::toml::Toml mmc::toml::parse_toml(const std::filesystem::path& path) {
 	std::ifstream in(path);
 	if (!in)
 		throw std::runtime_error("cannot open config: " + path.string());
@@ -613,7 +613,7 @@ shark::toml::Toml shark::toml::parse_toml(const std::filesystem::path& path) {
 }
 
 namespace {
-using Json = shark::json::Json;
+using Json = mmc::json::Json;
 	class Parser {
 	public:
 		explicit Parser(std::string_view input) :
@@ -811,28 +811,28 @@ using Json = shark::json::Json;
 	};
 } // namespace
 
-shark::json::Json shark::json::Json::parse(std::string_view text) { return Parser(text).parse(); }
+mmc::json::Json mmc::json::Json::parse(std::string_view text) { return Parser(text).parse(); }
 
-bool shark::json::Json::is_null() const { return std::holds_alternative<std::nullptr_t>(value_); }
+bool mmc::json::Json::is_null() const { return std::holds_alternative<std::nullptr_t>(value_); }
 
-bool shark::json::Json::is_string() const { return std::holds_alternative<std::string>(value_); }
+bool mmc::json::Json::is_string() const { return std::holds_alternative<std::string>(value_); }
 
-const std::string& shark::json::Json::string() const { return std::get<std::string>(value_); }
+const std::string& mmc::json::Json::string() const { return std::get<std::string>(value_); }
 
-double shark::json::Json::number() const { return std::get<double>(value_); }
+double mmc::json::Json::number() const { return std::get<double>(value_); }
 
-const shark::json::Json::Array& shark::json::Json::array() const { return std::get<Array>(value_); }
+const mmc::json::Json::Array& mmc::json::Json::array() const { return std::get<Array>(value_); }
 
-const shark::json::Json::Object& shark::json::Json::object() const { return std::get<Object>(value_); }
+const mmc::json::Json::Object& mmc::json::Json::object() const { return std::get<Object>(value_); }
 
-const shark::json::Json& shark::json::Json::at(const std::string& key) const {
+const mmc::json::Json& mmc::json::Json::at(const std::string& key) const {
 	auto i = object().find(key);
 	if (i == object().end())
 		throw std::runtime_error("missing JSON key: " + key);
 	return i->second;
 }
 
-const shark::json::Json* shark::json::Json::find(const std::string& key) const {
+const mmc::json::Json* mmc::json::Json::find(const std::string& key) const {
 	auto* o = std::get_if<Object>(&value_);
 	if (!o)
 		return nullptr;

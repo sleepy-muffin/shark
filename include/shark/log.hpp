@@ -28,29 +28,33 @@
 
 #include "shark/common.hpp"
 
-SHARK_BEGIN
 
-namespace log
+
+namespace mmc
+
 {
+
+  namespace log
+  {
 	// inline std::mutex _logger_bus;
-	
+
 	// Your message_type enum stays compatible
 	enum class message_type { INFO, DEBUG, EXCEPTION };
-	
+
 	// Internal backend class
 	class backend
 	{
 	public:
 		backend() : output_(&std::cout), worker_([this] { run(); }) {}
-		
+
 		~backend()
 		{
 			shutdown(); // automatic flush and stop
 		}
-		
+
 		backend(const backend&) = delete;
 		backend& operator=(const backend&) = delete;
-		
+
 		// Push a message into the queue
 		void push(
 			message_type type, std::string msg)
@@ -61,79 +65,108 @@ namespace log
 			}
 			cv_.notify_one();
 		}
-		
+
 		void set_output_file(
 			const std::filesystem::path& path, bool append = true)
 		{
 			auto file = std::make_unique<std::ofstream>(
 				path,
 				std::ios::out | (append ? std::ios::app : std::ios::trunc));
-			
+
 			if (!file->is_open()) {
 				throw std::runtime_error(
 					std::format("Failed to open log file: {}", path.string()));
 			}
-			
+
 			std::lock_guard lock(output_mtx_);
-			
+
 			if (output_) {
 				output_->flush();
 			}
-			
+
 			file_ = std::move(file);
 			output_ = file_.get();
 		}
-		
+
 		void set_output_stdout()
 		{
 			std::lock_guard lock(output_mtx_);
-			
+
 			if (output_) {
 				output_->flush();
 			}
-			
+
 			file_.reset();
 			output_ = &std::cout;
 		}
-		
+
 		// Explicit shutdown (optional)
 		void shutdown()
 		{
 			bool expected = false;
 			if (!stopped_.compare_exchange_strong(expected, true))
 				return; // already stopped
-				
+
 				{
 					std::lock_guard lock(mtx_);
 					stopping_ = true;
 				}
-				
+
 				cv_.notify_all();
-			
+
 			if (worker_.joinable())
 				worker_.join();
-			
+
 			std::lock_guard lock(output_mtx_);
 			if (output_) {
 				output_->flush();
 			}
 		}
-		
+
+		// std::FILE* file_ = nullptr;
+
+		template <typename... Types>
+		constexpr void info(
+			const std::format_string<Types...>& Fmt, Types&&... Args)
+		{
+			std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
+			push(message_type::INFO, info_str);
+		}
+
+		template <typename... Types>
+		constexpr void debug(
+			const std::format_string<Types...>& Fmt, Types&&... Args)
+		{
+			if constexpr (MMC_DEBUG) {
+				std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
+				push(message_type::DEBUG, info_str);
+			}
+		}
+
+		template <typename... Types>
+		constexpr void error(
+			const std::format_string<Types...>& Fmt, Types&&... Args)
+		{
+			std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
+			push(message_type::EXCEPTION, info_str);
+		}
+
+
 	private:
 		void run()
 		{
 			for (;;) {
 				std::unique_lock lock(mtx_);
 				cv_.wait(lock, [&] { return stopping_ || !queue_.empty(); });
-				
+
 				if (stopping_ && queue_.empty())
 					break;
-				
+
 				auto [type, msg] = std::move(queue_.front());
 				queue_.pop();
-				
+
 				lock.unlock();
-				
+
 				{
 					std::lock_guard output_lock(output_mtx_);
 					*output_ << msg << '\n';
@@ -141,87 +174,80 @@ namespace log
 				}
 			}
 		}
-		
+
 	private:
 		std::mutex mtx_;
 		std::condition_variable cv_;
 		std::queue<std::pair<message_type, std::string>> queue_;
 		bool stopping_ = false;
 		std::atomic_bool stopped_ = false;
-		
+
 		std::mutex output_mtx_;
 		std::unique_ptr<std::ofstream> file_;
 		std::ostream* output_;
-		
+
 		std::thread worker_;
 	};
-	
+
 	// Function-local static instance ensures automatic creation
-	inline backend& instance()
+	inline backend& singleton()
 	{
 		static backend b;
 		return b;
 	}
-	
+
 	inline void set_output_file(
 		const std::filesystem::path& path, bool append = true)
 	{
-		instance().set_output_file(path, append);
+		singleton().set_output_file(path, append);
 	}
-	
+
 	inline void set_output_stdout()
 	{
-		instance().set_output_stdout();
+		singleton().set_output_stdout();
 	}
-	
+
 	// Submit API matches your previous API exactly
 	inline void submit(
 		message_type type, const std::string& msg)
 	{
-		instance().push(type, msg);
+		singleton().push(type, msg);
 	}
-	
+
 	inline void submit(
 		message_type type, std::string&& msg)
 	{
-		instance().push(type, std::move(msg));
+		singleton().push(type, std::move(msg));
 	}
-	
-	// Optional kill() function for explicit shutdown
-	inline void kill()
-	{
-		instance().shutdown();
-	}
-	
+
+
 	template <typename... Types>
 	constexpr void info(
 		const std::format_string<Types...>& Fmt, Types&&... Args)
 	{
-		std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
-		submit(message_type::INFO, info_str);
-		
-		// std::string info_str = std::format("INFO:  {}", std::format(Fmt,
-		// std::forward<Types>(Args)...)); submit(info_str);
+		singleton().info(Fmt, std::forward<Types>(Args)...);
 	}
-	
+
 	template <typename... Types>
 	constexpr void debug(
 		const std::format_string<Types...>& Fmt, Types&&... Args)
 	{
-		// print<"INFO: {}">(std::format(Fmt, std::forward<Types>(Args)...));
-		if constexpr (SHARK_DEBUG) {
-			std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
-			submit(message_type::DEBUG, info_str);
-		}
+	  singleton().debug(Fmt, std::forward<Types>(Args)...);
 	}
-	
+
 	template <typename... Types>
-	constexpr void exception(
+	constexpr void error(
 		const std::format_string<Types...>& Fmt, Types&&... Args)
 	{
-		std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
-		submit(message_type::EXCEPTION, info_str);
+    singleton().error(Fmt, std::forward<Types>(Args)...);
 	}
+
+	// Optional kill() function for explicit shutdown
+	inline void kill()
+	{
+		singleton().shutdown();
+	}
+
 } // namespace log
 
 template <typename... Types>
@@ -244,14 +270,14 @@ struct pinch : std::exception
 	}
 	// pinch(std::string_view func_name, std::string_view information) : std::exception{},
 	// msg_(std::format("trace {}:{}", func_name, information)) { }
-	
+
 	pinch() : std::exception{}, msg_("{null}") {}
-	
+
 	virtual const char* what() const noexcept override
 	{
 		return msg_.c_str();
 	}
-	
+
 	std::string msg_;
 };
 
@@ -259,13 +285,12 @@ template <typename... Types>
 void raise(
 	const std::format_string<Types...>& Fmt, Types&&... Args)
 {
-	shark::print(Fmt, std::forward<Types>(Args)...);
+	mmc::print(Fmt, std::forward<Types>(Args)...);
 	throw pinch(Fmt, std::forward<Types>(Args)...);
 }
 
-#undef assert
 template <typename... Types>
-void assert(
+void check(
 	bool condition, const std::format_string<Types...>& Fmt, Types&&... Args)
 {
 	if (!condition) {
@@ -273,12 +298,10 @@ void assert(
 	}
 }
 
-inline void assert(
+inline void check(
 	bool condition)
 {
-	assert(condition, "");
+	check(condition, "");
 }
 
-SHARK_END
-
-
+}

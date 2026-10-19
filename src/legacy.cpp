@@ -11,7 +11,7 @@
 
 #ifdef __linux__
 
-std::string shark::find_system_font(
+std::string mmc::find_system_font(
 	std::string_view name)
 {
 	std::string command = "fc-match -f '%{file}' \"" + std::string(name) + "\"";
