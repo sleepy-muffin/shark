@@ -13,7 +13,7 @@
 #include "shark/external.hpp"
 
 
-boost::json::object mmc::file::read_json(
+boost::json::object shark::file::read_json(
 	std::string_view path)
 {
 	namespace json = boost::json;
@@ -21,7 +21,7 @@ boost::json::object mmc::file::read_json(
 	return raw.as_object();
 }
 
-void mmc::file::dump_json(
+void shark::file::dump_json(
 	std::string_view path, const boost::json::object& js)
 {
 	namespace json = boost::json;

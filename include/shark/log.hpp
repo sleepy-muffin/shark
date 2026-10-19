@@ -29,279 +29,268 @@
 #include "shark/common.hpp"
 
 
+namespace shark {
+namespace log {
+  // inline std::mutex _logger_bus;
 
-namespace mmc
+  // Your message_type enum stays compatible
+  enum class message_type { INFO, DEBUG, EXCEPTION };
 
-{
+  // Internal backend class
+  class backend {
+  public:
+    backend()
+      : output_(&std::cout), worker_([this] { run(); }) {
+    }
 
-  namespace log
-  {
-	// inline std::mutex _logger_bus;
+    ~backend() {
+      shutdown(); // automatic flush and stop
+    }
 
-	// Your message_type enum stays compatible
-	enum class message_type { INFO, DEBUG, EXCEPTION };
+    backend(const backend&) = delete;
+    backend& operator=(const backend&) = delete;
 
-	// Internal backend class
-	class backend
-	{
-	public:
-		backend() : output_(&std::cout), worker_([this] { run(); }) {}
+    // Push a message into the queue
+    void push(
+      message_type type, std::string msg
+    ) {
+      {
+        std::lock_guard lock(mtx_);
+        queue_.emplace(type, std::move(msg));
+      }
+      cv_.notify_one();
+    }
 
-		~backend()
-		{
-			shutdown(); // automatic flush and stop
-		}
+    void set_output_file(
+      const std::filesystem::path& path, bool append = true
+    ) {
+      auto file = std::make_unique<std::ofstream>(
+        path,
+        std::ios::out | (append ? std::ios::app : std::ios::trunc)
+      );
 
-		backend(const backend&) = delete;
-		backend& operator=(const backend&) = delete;
+      if (!file->is_open()) {
+        throw std::runtime_error(
+          std::format("Failed to open log file: {}", path.string())
+        );
+      }
 
-		// Push a message into the queue
-		void push(
-			message_type type, std::string msg)
-		{
-			{
-				std::lock_guard lock(mtx_);
-				queue_.emplace(type, std::move(msg));
-			}
-			cv_.notify_one();
-		}
+      std::lock_guard lock(output_mtx_);
 
-		void set_output_file(
-			const std::filesystem::path& path, bool append = true)
-		{
-			auto file = std::make_unique<std::ofstream>(
-				path,
-				std::ios::out | (append ? std::ios::app : std::ios::trunc));
+      if (output_) {
+        output_->flush();
+      }
 
-			if (!file->is_open()) {
-				throw std::runtime_error(
-					std::format("Failed to open log file: {}", path.string()));
-			}
+      file_ = std::move(file);
+      output_ = file_.get();
+    }
 
-			std::lock_guard lock(output_mtx_);
+    void set_output_stdout() {
+      std::lock_guard lock(output_mtx_);
 
-			if (output_) {
-				output_->flush();
-			}
+      if (output_) {
+        output_->flush();
+      }
 
-			file_ = std::move(file);
-			output_ = file_.get();
-		}
+      file_.reset();
+      output_ = &std::cout;
+    }
 
-		void set_output_stdout()
-		{
-			std::lock_guard lock(output_mtx_);
+    // Explicit shutdown (optional)
+    void shutdown() {
+      bool expected = false;
+      if (!stopped_.compare_exchange_strong(expected, true))
+        return; // already stopped
 
-			if (output_) {
-				output_->flush();
-			}
+      {
+        std::lock_guard lock(mtx_);
+        stopping_ = true;
+      }
 
-			file_.reset();
-			output_ = &std::cout;
-		}
+      cv_.notify_all();
 
-		// Explicit shutdown (optional)
-		void shutdown()
-		{
-			bool expected = false;
-			if (!stopped_.compare_exchange_strong(expected, true))
-				return; // already stopped
+      if (worker_.joinable())
+        worker_.join();
 
-				{
-					std::lock_guard lock(mtx_);
-					stopping_ = true;
-				}
+      std::lock_guard lock(output_mtx_);
+      if (output_) {
+        output_->flush();
+      }
+    }
 
-				cv_.notify_all();
+    // std::FILE* file_ = nullptr;
 
-			if (worker_.joinable())
-				worker_.join();
+    template<typename... Types>
+    constexpr void info(
+      const std::format_string<Types...>& Fmt, Types&&... Args
+    ) {
+      std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
+      push(message_type::INFO, info_str);
+    }
 
-			std::lock_guard lock(output_mtx_);
-			if (output_) {
-				output_->flush();
-			}
-		}
+    template<typename... Types>
+    constexpr void debug(
+      const std::format_string<Types...>& Fmt, Types&&... Args
+    ) {
+      if constexpr (__SHARK_DEBUG__) {
+        std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
+        push(message_type::DEBUG, info_str);
+      }
+    }
 
-		// std::FILE* file_ = nullptr;
+    template<typename... Types>
+    constexpr void error(
+      const std::format_string<Types...>& Fmt, Types&&... Args
+    ) {
+      std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
+      push(message_type::EXCEPTION, info_str);
+    }
 
-		template <typename... Types>
-		constexpr void info(
-			const std::format_string<Types...>& Fmt, Types&&... Args)
-		{
-			std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
-			push(message_type::INFO, info_str);
-		}
+  private:
+    void run() {
+      for (;;) {
+        std::unique_lock lock(mtx_);
+        cv_.wait(lock, [&] { return stopping_ || !queue_.empty(); });
 
-		template <typename... Types>
-		constexpr void debug(
-			const std::format_string<Types...>& Fmt, Types&&... Args)
-		{
-			if constexpr (MMC_DEBUG) {
-				std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
-				push(message_type::DEBUG, info_str);
-			}
-		}
+        if (stopping_ && queue_.empty())
+          break;
 
-		template <typename... Types>
-		constexpr void error(
-			const std::format_string<Types...>& Fmt, Types&&... Args)
-		{
-			std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
-			push(message_type::EXCEPTION, info_str);
-		}
+        auto [type, msg] = std::move(queue_.front());
+        queue_.pop();
 
+        lock.unlock();
 
-	private:
-		void run()
-		{
-			for (;;) {
-				std::unique_lock lock(mtx_);
-				cv_.wait(lock, [&] { return stopping_ || !queue_.empty(); });
+        {
+          std::lock_guard output_lock(output_mtx_);
+          *output_ << msg << '\n';
+          output_->flush();
+        }
+      }
+    }
 
-				if (stopping_ && queue_.empty())
-					break;
+  private:
+    std::mutex mtx_;
+    std::condition_variable cv_;
+    std::queue<std::pair<message_type, std::string> > queue_;
+    bool stopping_ = false;
+    std::atomic_bool stopped_ = false;
 
-				auto [type, msg] = std::move(queue_.front());
-				queue_.pop();
+    std::mutex output_mtx_;
+    std::unique_ptr<std::ofstream> file_;
+    std::ostream* output_;
 
-				lock.unlock();
+    std::thread worker_;
+  };
 
-				{
-					std::lock_guard output_lock(output_mtx_);
-					*output_ << msg << '\n';
-					output_->flush();
-				}
-			}
-		}
+  // Function-local static instance ensures automatic creation
+  inline backend& singleton() {
+    static backend b;
+    return b;
+  }
 
-	private:
-		std::mutex mtx_;
-		std::condition_variable cv_;
-		std::queue<std::pair<message_type, std::string>> queue_;
-		bool stopping_ = false;
-		std::atomic_bool stopped_ = false;
+  inline void set_output_file(
+    const std::filesystem::path& path, bool append = true
+  ) {
+    singleton().set_output_file(path, append);
+  }
 
-		std::mutex output_mtx_;
-		std::unique_ptr<std::ofstream> file_;
-		std::ostream* output_;
+  inline void set_output_stdout() {
+    singleton().set_output_stdout();
+  }
 
-		std::thread worker_;
-	};
+  // Submit API matches your previous API exactly
+  inline void submit(
+    const message_type type, const std::string& msg
+  ) {
+    singleton().push(type, msg);
+  }
 
-	// Function-local static instance ensures automatic creation
-	inline backend& singleton()
-	{
-		static backend b;
-		return b;
-	}
-
-	inline void set_output_file(
-		const std::filesystem::path& path, bool append = true)
-	{
-		singleton().set_output_file(path, append);
-	}
-
-	inline void set_output_stdout()
-	{
-		singleton().set_output_stdout();
-	}
-
-	// Submit API matches your previous API exactly
-	inline void submit(
-		message_type type, const std::string& msg)
-	{
-		singleton().push(type, msg);
-	}
-
-	inline void submit(
-		message_type type, std::string&& msg)
-	{
-		singleton().push(type, std::move(msg));
-	}
+  inline void submit(
+    message_type type, std::string&& msg
+  ) {
+    singleton().push(type, std::move(msg));
+  }
 
 
-	template <typename... Types>
-	constexpr void info(
-		const std::format_string<Types...>& Fmt, Types&&... Args)
-	{
-		singleton().info(Fmt, std::forward<Types>(Args)...);
-	}
+  template<typename... Types>
+  constexpr void info(
+    const std::format_string<Types...>& Fmt, Types&&... Args
+  ) {
+    singleton().info(Fmt, std::forward<Types>(Args)...);
+  }
 
-	template <typename... Types>
-	constexpr void debug(
-		const std::format_string<Types...>& Fmt, Types&&... Args)
-	{
-	  singleton().debug(Fmt, std::forward<Types>(Args)...);
-	}
+  template<typename... Types>
+  constexpr void debug(
+    const std::format_string<Types...>& Fmt, Types&&... Args
+  ) {
+    singleton().debug(Fmt, std::forward<Types>(Args)...);
+  }
 
-	template <typename... Types>
-	constexpr void error(
-		const std::format_string<Types...>& Fmt, Types&&... Args)
-	{
+  template<typename... Types>
+  constexpr void error(
+    const std::format_string<Types...>& Fmt, Types&&... Args
+  ) {
     singleton().error(Fmt, std::forward<Types>(Args)...);
-	}
+  }
 
-	// Optional kill() function for explicit shutdown
-	inline void kill()
-	{
-		singleton().shutdown();
-	}
-
+  // Optional kill() function for explicit shutdown
+  inline void kill() {
+    singleton().shutdown();
+  }
 } // namespace log
 
-template <typename... Types>
+template<typename... Types>
 constexpr void print(
-	const std::format_string<Types...>& Fmt, Types&&... Args)
-{
-	std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
-	log::submit(log::message_type::INFO, info_str);
+  const std::format_string<Types...>& Fmt, Types&&... Args
+) {
+  std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
+  log::submit(log::message_type::INFO, info_str);
 }
 
 
-struct pinch : std::exception
-{
-	template <typename... Types>
-	constexpr pinch(
-		const std::format_string<Types...>& Fmt, Types&&... Args)
-	{
-		std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
-		msg_ = std::format("trace {}:{}", SHARK_FUNCTION, info_str);
-	}
-	// pinch(std::string_view func_name, std::string_view information) : std::exception{},
-	// msg_(std::format("trace {}:{}", func_name, information)) { }
+struct pinch : std::exception {
+  template<typename... Types>
+   constexpr pinch(
+    const std::format_string<Types...>& Fmt, Types&&... Args
+  ) {
+    std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
+    msg_ = std::format("trace {}:{}", SHARK_FUNCTION, info_str);
+  }
 
-	pinch() : std::exception{}, msg_("{null}") {}
+  // pinch(std::string_view func_name, std::string_view information) : std::exception{},
+  // msg_(std::format("trace {}:{}", func_name, information)) { }
 
-	virtual const char* what() const noexcept override
-	{
-		return msg_.c_str();
-	}
+  pinch()
+    : std::exception{}, msg_("{null}") {
+  }
 
-	std::string msg_;
+  [[nodiscard]] const char* what() const noexcept override {
+    return msg_.c_str();
+  }
+
+  std::string msg_;
 };
 
-template <typename... Types>
+template<typename... Types>
 void raise(
-	const std::format_string<Types...>& Fmt, Types&&... Args)
-{
-	mmc::print(Fmt, std::forward<Types>(Args)...);
-	throw pinch(Fmt, std::forward<Types>(Args)...);
+  const std::format_string<Types...>& Fmt, Types&&... Args
+) {
+  shark::print(Fmt, std::forward<Types>(Args)...);
+  throw pinch(Fmt, std::forward<Types>(Args)...);
 }
 
-template <typename... Types>
+template<typename... Types>
 void check(
-	bool condition, const std::format_string<Types...>& Fmt, Types&&... Args)
-{
-	if (!condition) {
-		raise(Fmt, std::forward<Types>(Args)...);
-	}
+  bool condition, const std::format_string<Types...>& Fmt, Types&&... Args
+) {
+  if (!condition) {
+    raise(Fmt, std::forward<Types>(Args)...);
+  }
 }
 
 inline void check(
-	bool condition)
-{
-	check(condition, "");
+  bool condition
+) {
+  check(condition, "");
 }
-
 }

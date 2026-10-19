@@ -19,13 +19,21 @@ find_library(MPG123_LIBRARY NAMES mpg123 REQUIRED)
 find_path(LAME_INCLUDE_DIR NAMES lame/lame.h lame.h REQUIRED)
 find_library(LAME_LIBRARY NAMES mp3lame lame REQUIRED)
 
-add_library(${PROJECT_NAME} STATIC
-	src/audio.cpp
-	src/external.cpp
-	src/image.cpp
-	src/legacy.cpp
+add_library(
+        ${PROJECT_NAME}
+        STATIC
+        src/audio.cpp
+        src/external.cpp
+        src/image.cpp
+        src/legacy.cpp
         src/str.cpp
-	src/termux.cpp
+        src/termux.cpp
+        include/shark/sqlite3.hpp
+        src/sqlite3.cpp
+        src/json.cpp
+        include/shark/json.hpp
+        include/shark/toml.hpp
+        src/toml.cpp
 )
 
 target_include_directories(${PROJECT_NAME}

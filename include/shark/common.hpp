@@ -15,9 +15,6 @@
 
 #include <vector>
 
-#define MMC_BEGIN namespace mmc {
-#define MMC_END }
-
 #define MMC_EXPORT
 
 #if !defined(SHARK_FUNCTION)
@@ -27,11 +24,11 @@
 #endif
 #endif
 
-MMC_BEGIN
+namespace shark {
 #ifdef __SHARK_DEBUG__
-constexpr bool MMC_DEBUG = true;
+constexpr bool __SHARK_DEBUG__ = true;
 #else
-constexpr bool MMC_DEBUG = false;
+constexpr bool __SHARK_DEBUG__ = false;
 #endif
 
 template<class>
@@ -75,6 +72,5 @@ private:
     return *static_cast<F *>(this);
   }
 };
-
-MMC_END
+}
 
