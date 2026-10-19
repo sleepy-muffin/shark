@@ -18,7 +18,7 @@
 
 #include <GL/gl.h>
 
-namespace mmc::media
+namespace shark::media
 {
 	
 	struct texture

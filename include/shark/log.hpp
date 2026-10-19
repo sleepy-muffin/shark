@@ -132,7 +132,7 @@ namespace log {
     constexpr void debug(
       const std::format_string<Types...>& Fmt, Types&&... Args
     ) {
-      if constexpr (__SHARK_DEBUG__) {
+      if constexpr (SHARK_DEBUG) {
         std::string info_str = std::format(Fmt, std::forward<Types>(Args)...);
         push(message_type::DEBUG, info_str);
       }

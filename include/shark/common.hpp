@@ -25,11 +25,7 @@
 #endif
 
 namespace shark {
-#ifdef __SHARK_DEBUG__
-constexpr bool __SHARK_DEBUG__ = true;
-#else
-constexpr bool __SHARK_DEBUG__ = false;
-#endif
+constexpr bool SHARK_DEBUG = false;
 
 template<class>
 struct function_traits;

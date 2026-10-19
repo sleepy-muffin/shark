@@ -17,7 +17,7 @@
 #include <memory>
 #include <vector>
 
-namespace mmc::media
+namespace shark::media
 {
 
 enum class sample_encoding {
@@ -252,7 +252,7 @@ struct Result
 };
 
 options preset_config(const std::string& name);
-Result process(mmc::media::decoded_pcm& audio, const options& config);
+Result process(shark::media::decoded_pcm& audio, const options& config);
 const char* to_string(event_kind kind);
 const char* to_string(repair_mode mode);
 repair_mode parse_repair_mode(const std::string& name);

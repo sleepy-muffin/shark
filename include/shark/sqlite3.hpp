@@ -22,7 +22,7 @@ struct sqlite3_stmt;
 // file and prepares statements, while `database` owns the tables. The legacy
 // `lnb::sqlite_interface` could not be reused because its constructor runs the
 // old schema and its migrations.
-namespace mmc::sqlite
+namespace shark::sqlite
 {
 // // //
 

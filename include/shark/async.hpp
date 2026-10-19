@@ -30,7 +30,7 @@
 #include "shark/common.hpp"
 #include "shark/log.hpp"
 
-namespace mmc::async {
+namespace shark::async {
 struct io_context;
 
 struct delayer {
@@ -366,7 +366,7 @@ struct io_context {
         continue;
       }
 
-      if constexpr (MMC_DEBUG) {
+      if constexpr (SHARK_DEBUG) {
         log::debug("selected {}", sit->stacks());
       }
       // If the condition is true, then the thread hasn't bound to
@@ -380,7 +380,7 @@ struct io_context {
         }
         // Coroutine can call others and emplace them to the stack in io_context,
         // but it mustn't resume coroutines behind.
-        if constexpr (MMC_DEBUG) {
+        if constexpr (SHARK_DEBUG) {
           log::debug("resuming {}", sit->stacks());
         }
         sit->addresses_.top().resume();
@@ -420,7 +420,7 @@ struct io_context {
         local_delayer.exec_delay();
       }
     }
-    if constexpr (MMC_DEBUG) {
+    if constexpr (SHARK_DEBUG) {
       log::debug(
         "io_context::run has ended since no candidate async action is provided"
         "  I guess. it's something you expect"
@@ -599,8 +599,8 @@ public:
   }
 
 private:
-  mmc::async::awaitable<int> async_load(int id) {
-    mmc::async::deadline_timer timer;
+  shark::async::awaitable<int> async_load(int id) {
+    shark::async::deadline_timer timer;
 
     while (!shutting_down_) {
       job_type job;
@@ -628,7 +628,7 @@ private:
 
   std::atomic_bool shutting_down_ = false;
 
-  mmc::async::io_context ioc;
+  shark::async::io_context ioc;
   std::vector<std::thread> threads;
 };
 } // namespace shark::async

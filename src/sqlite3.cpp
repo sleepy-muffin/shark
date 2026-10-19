@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace mmc::sqlite {
+namespace shark::sqlite {
 
 namespace {
 
