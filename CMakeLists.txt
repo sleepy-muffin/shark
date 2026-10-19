@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+find_package(SQLite3 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS json)
 find_package(OpenGL REQUIRED)
 find_package(JPEG REQUIRED)
@@ -37,20 +38,23 @@ add_library(
 )
 
 target_include_directories(${PROJECT_NAME}
-	PUBLIC
-		${CMAKE_CURRENT_SOURCE_DIR}/include
-		${OPUS_INCLUDE_DIR}
-		${MPG123_INCLUDE_DIR}
-		${LAME_INCLUDE_DIR}
+        PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${OPUS_INCLUDE_DIR}
+        ${MPG123_INCLUDE_DIR}
+        ${LAME_INCLUDE_DIR}
+        ${SQLite3_INCLUDE_DIRS}
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE
-	JPEG::JPEG PNG::PNG
-	OpenGL::GL
-	${OPUSFILE_LIBRARY}
-	${OPUSENC_LIBRARY}
-	${MPG123_LIBRARY}
-	${LAME_LIBRARY}
+target_link_libraries(${PROJECT_NAME}
+        PRIVATE
+        JPEG::JPEG PNG::PNG
+        OpenGL::GL
+        ${OPUSFILE_LIBRARY}
+        ${OPUSENC_LIBRARY}
+        ${MPG123_LIBRARY}
+        ${LAME_LIBRARY}
+        ${SQLite3_LIBRARIES}
 )
 
 target_compile_options(${PROJECT_NAME} PRIVATE -O2)
