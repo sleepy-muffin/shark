@@ -28,7 +28,6 @@ add_library(
         src/image.cpp
         src/legacy.cpp
         src/str.cpp
-        src/termux.cpp
         include/shark/sqlite3.hpp
         src/sqlite3.cpp
         src/json.cpp

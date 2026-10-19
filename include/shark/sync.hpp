@@ -20,7 +20,7 @@
 
 #include "shark/common.hpp"
 
-namespace mmc
+namespace shark
 {
 
 template <typename T>
