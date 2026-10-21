@@ -1,7 +1,3 @@
-//
-// Created by menv on 10/19/26.
-//
-
 #pragma once
 
 #include "shark/common.hpp"
@@ -111,4 +107,3 @@ private:
 };
 
 } // namespace lnb::store
-

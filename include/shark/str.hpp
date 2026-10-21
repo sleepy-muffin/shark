@@ -1,12 +1,3 @@
-/*
- * Project: shark
- * Repository: https://github.com/leaked32/shark
- *
- * File: shark/include/shark/str.hpp
- *
- * License: MIT
- */
-
 #pragma once
 #include <charconv>
 #include <filesystem>
@@ -150,4 +141,3 @@ void indented_print(std::string_view s, char c = ' ', int n = 4);
 std::string indent(std::string_view s, char c = ' ', int n = 4);
 
 } // namespace shark::str
-

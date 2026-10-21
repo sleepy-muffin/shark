@@ -1,12 +1,3 @@
-/*
- * Project: shark
- * Repository: https://github.com/leaked32/shark
- *
- * File: shark/include/shark/math.hpp
- *
- * License: MIT
- */
-
 #pragma once
 
 #ifndef __cplusplus

@@ -1,12 +1,3 @@
-/*
- * Project: shark
- * Repository: https://github.com/leaked32/shark
- *
- * File: shark/include/shark/external.hpp
- *
- * License: MIT
- */
-
 #pragma once
 
 #ifndef __cplusplus
@@ -22,4 +13,3 @@ namespace shark::file
 boost::json::object read_json(std::string_view path);
 void dump_json(std::string_view path, const boost::json::object& js);
 } // namespace file
-
