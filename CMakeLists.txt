@@ -30,68 +30,176 @@ else()
 endif()
 
 # ========== ---------- ---------- ---------- ==========
+#                         OPTIONS
+# ========== ---------- ---------- ---------- ==========
+
+
+# Modules with heavy external dependencies are opt-out. Consumers that do not
+# need them can turn them off before adding shark (add_subdirectory/FetchContent)
+# and CMake will not look for their dependencies at all.
+option(SHARK_BUILD_EXTERNAL "Build the external module (Boost.JSON helpers)" ON)
+option(SHARK_BUILD_SQLITE3 "Build the sqlite3 module" ON)
+option(SHARK_BUILD_IMAGE "Build the image module (OpenGL/JPEG/PNG)" ON)
+option(SHARK_BUILD_AUDIO "Build the audio module (opus/opusfile/mpg123/lame)" ON)
+
+set(SHARK_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
+
+# ========== ---------- ---------- ---------- ==========
 #                         SET UP
 # ========== ---------- ---------- ---------- ==========
 
 
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(SQLite3 REQUIRED)
-find_package(Boost REQUIRED COMPONENTS json)
-find_package(OpenGL REQUIRED)
-find_package(JPEG REQUIRED)
-find_package(PNG REQUIRED)
-find_library(OPUSENC_LIBRARY NAMES opusenc REQUIRED)
-find_path(OPUS_INCLUDE_DIR NAMES opus.h PATH_SUFFIXES opus REQUIRED)
-find_library(OPUSFILE_LIBRARY NAMES opusfile REQUIRED)
-find_path(MPG123_INCLUDE_DIR NAMES mpg123.h REQUIRED)
-find_library(MPG123_LIBRARY NAMES mpg123 REQUIRED)
-find_path(LAME_INCLUDE_DIR NAMES lame/lame.h lame.h REQUIRED)
-find_library(LAME_LIBRARY NAMES mp3lame lame REQUIRED)
 
-add_library(
-        ${PROJECT_NAME}
-        STATIC
-        src/audio.cpp
-        src/external.cpp
-        src/image.cpp
-        src/legacy.cpp
+# Register a module as its own target, plus a shark::<name> alias.
+#
+#   shark_add_module(<name> INTERFACE [PUBLIC <targets...>])
+#   shark_add_module(<name> STATIC
+#       SOURCES <files...>
+#       [PUBLIC <targets...>]
+#       [PRIVATE <targets...>]
+#       [PRIVATE_INCLUDES <dirs...>])
+function(shark_add_module name type)
+    cmake_parse_arguments(ARG "" "" "SOURCES;PUBLIC;PRIVATE;PRIVATE_INCLUDES" ${ARGN})
+
+    set(target "shark_${name}")
+
+    add_library(${target} ${type} ${ARG_SOURCES})
+    add_library(shark::${name} ALIAS ${target})
+
+    if(type STREQUAL "INTERFACE")
+        target_include_directories(${target} INTERFACE ${SHARK_INCLUDE_DIR})
+        target_compile_features(${target} INTERFACE cxx_std_20)
+
+        if(ARG_PUBLIC)
+            target_link_libraries(${target} INTERFACE ${ARG_PUBLIC})
+        endif()
+    else()
+        target_include_directories(${target} PUBLIC ${SHARK_INCLUDE_DIR})
+        if(ARG_PRIVATE_INCLUDES)
+            target_include_directories(${target} PRIVATE ${ARG_PRIVATE_INCLUDES})
+        endif()
+
+        target_compile_features(${target} PUBLIC cxx_std_20)
+
+        if(ARG_PUBLIC)
+            target_link_libraries(${target} PUBLIC ${ARG_PUBLIC})
+        endif()
+        if(ARG_PRIVATE)
+            target_link_libraries(${target} PRIVATE ${ARG_PRIVATE})
+        endif()
+
+        set_target_properties(${target} PROPERTIES
+                OUTPUT_NAME "shark-${name}-${PLATFORM}-${ARCH}"
+        )
+
+        target_compile_options(${target} PRIVATE -O2)
+
+        # When shark is vendored (add_subdirectory/FetchContent), only compile
+        # the modules a consuming target actually links. Building shark itself
+        # as the top-level project still builds everything.
+        if(NOT PROJECT_IS_TOP_LEVEL)
+            set_target_properties(${target} PROPERTIES EXCLUDE_FROM_ALL TRUE)
+        endif()
+    endif()
+
+    set(SHARK_MODULE_TARGETS ${SHARK_MODULE_TARGETS} ${target} PARENT_SCOPE)
+endfunction()
+
+
+# ========== ---------- ---------- ---------- ==========
+#                   STANDARD C++ CORE MODULE
+# ========== ---------- ---------- ---------- ==========
+
+
+# common, log, sync, async, math, str, legacy, toml and json only need the
+# standard library, so they are compiled into a single target.
+shark_add_module(common STATIC
+        SOURCES
         src/str.cpp
-        include/shark/sqlite3.hpp
-        src/sqlite3.cpp
-        src/json.cpp
-        include/shark/json.hpp
-        include/shark/toml.hpp
+        src/legacy.cpp
         src/toml.cpp
+        src/json.cpp
 )
 
 
-set_target_properties(${PROJECT_NAME} PROPERTIES
-        OUTPUT_NAME "${PROJECT_NAME}-${PLATFORM}-${ARCH}"
-)
+# ========== ---------- ---------- ---------- ==========
+#                     EXTERNAL MODULES
+# ========== ---------- ---------- ---------- ==========
 
 
-target_include_directories(${PROJECT_NAME}
-        PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${OPUS_INCLUDE_DIR}
-        ${MPG123_INCLUDE_DIR}
-        ${LAME_INCLUDE_DIR}
-        ${SQLite3_INCLUDE_DIRS}
-)
+if(SHARK_BUILD_EXTERNAL)
+    find_package(Boost REQUIRED COMPONENTS json)
 
-target_link_libraries(${PROJECT_NAME}
-        PRIVATE
-        JPEG::JPEG PNG::PNG
-        OpenGL::GL
-        ${OPUSFILE_LIBRARY}
-        ${OPUSENC_LIBRARY}
-        ${MPG123_LIBRARY}
-        ${LAME_LIBRARY}
-        ${SQLite3_LIBRARIES}
-)
+    # external.hpp exposes boost::json in its public API.
+    shark_add_module(external STATIC
+            SOURCES src/external.cpp
+            PUBLIC shark::common Boost::json
+    )
+endif()
 
-target_compile_options(${PROJECT_NAME} PRIVATE -O2)
+if(SHARK_BUILD_SQLITE3)
+    find_package(SQLite3 REQUIRED)
+
+    # SQLite3::SQLite3 is the current target name; older CMake only provides
+    # SQLite::SQLite3.
+    if(TARGET SQLite3::SQLite3)
+        set(SHARK_SQLITE3_TARGET SQLite3::SQLite3)
+    else()
+        set(SHARK_SQLITE3_TARGET SQLite::SQLite3)
+    endif()
+
+    shark_add_module(sqlite3 STATIC
+            SOURCES src/sqlite3.cpp
+            PUBLIC shark::common
+            PRIVATE ${SHARK_SQLITE3_TARGET}
+    )
+endif()
+
+if(SHARK_BUILD_IMAGE)
+    find_package(OpenGL REQUIRED)
+    find_package(JPEG REQUIRED)
+    find_package(PNG REQUIRED)
+
+    # image.hpp includes <GL/gl.h> in its public API.
+    shark_add_module(image STATIC
+            SOURCES src/image.cpp
+            PUBLIC OpenGL::GL
+            PRIVATE JPEG::JPEG PNG::PNG
+    )
+endif()
+
+if(SHARK_BUILD_AUDIO)
+    find_library(OPUSENC_LIBRARY NAMES opusenc REQUIRED)
+    find_path(OPUS_INCLUDE_DIR NAMES opus.h PATH_SUFFIXES opus REQUIRED)
+    find_library(OPUSFILE_LIBRARY NAMES opusfile REQUIRED)
+    find_path(MPG123_INCLUDE_DIR NAMES mpg123.h REQUIRED)
+    find_library(MPG123_LIBRARY NAMES mpg123 REQUIRED)
+    find_path(LAME_INCLUDE_DIR NAMES lame/lame.h lame.h REQUIRED)
+    find_library(LAME_LIBRARY NAMES mp3lame lame REQUIRED)
+
+    shark_add_module(audio STATIC
+            SOURCES src/audio.cpp
+            PRIVATE
+            ${OPUSENC_LIBRARY} ${OPUSFILE_LIBRARY}
+            ${MPG123_LIBRARY} ${LAME_LIBRARY}
+            PRIVATE_INCLUDES
+            ${OPUS_INCLUDE_DIR} ${MPG123_INCLUDE_DIR} ${LAME_INCLUDE_DIR}
+    )
+endif()
+
+
+# ========== ---------- ---------- ---------- ==========
+#                     UMBRELLA TARGET
+# ========== ---------- ---------- ---------- ==========
+
+
+# Kept for existing consumers: linking `shark` gives every enabled module.
+# Lean consumers should link `shark::<module>` instead.
+add_library(shark INTERFACE)
+add_library(shark::shark ALIAS shark)
+
+target_include_directories(shark INTERFACE ${SHARK_INCLUDE_DIR})
+target_compile_features(shark INTERFACE cxx_std_20)
+target_link_libraries(shark INTERFACE ${SHARK_MODULE_TARGETS})
