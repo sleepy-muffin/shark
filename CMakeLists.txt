@@ -49,6 +49,8 @@ set(SHARK_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 # ========== ---------- ---------- ---------- ==========
 
 
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 
@@ -70,7 +72,7 @@ function(shark_add_module name type)
 
     if(type STREQUAL "INTERFACE")
         target_include_directories(${target} INTERFACE ${SHARK_INCLUDE_DIR})
-        target_compile_features(${target} INTERFACE cxx_std_20)
+        # target_compile_features(${target} INTERFACE cxx_std_20)
 
         if(ARG_PUBLIC)
             target_link_libraries(${target} INTERFACE ${ARG_PUBLIC})
@@ -81,7 +83,7 @@ function(shark_add_module name type)
             target_include_directories(${target} PRIVATE ${ARG_PRIVATE_INCLUDES})
         endif()
 
-        target_compile_features(${target} PUBLIC cxx_std_20)
+        # target_compile_features(${target} PUBLIC cxx_std_20)
 
         if(ARG_PUBLIC)
             target_link_libraries(${target} PUBLIC ${ARG_PUBLIC})
@@ -219,7 +221,7 @@ add_library(shark INTERFACE)
 add_library(shark::shark ALIAS shark)
 
 target_include_directories(shark INTERFACE ${SHARK_INCLUDE_DIR})
-target_compile_features(shark INTERFACE cxx_std_20)
+# target_compile_features(shark INTERFACE cxx_std_20)
 target_link_libraries(shark INTERFACE ${SHARK_MODULE_TARGETS})
 
 # ========== ---------- ---------- ---------- ==========
