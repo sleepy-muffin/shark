@@ -37,7 +37,7 @@ endif()
 # Modules with heavy external dependencies are opt-out. Consumers that do not
 # need them can turn them off before adding shark (add_subdirectory/FetchContent)
 # and CMake will not look for their dependencies at all.
-option(SHARK_BUILD_EXTERNAL "Build the external module (Boost.JSON helpers)" ON)
+option(SHARK_BUILD_NET "Build the external module (Boost.JSON helpers)" ON)
 option(SHARK_BUILD_SQLITE3 "Build the sqlite3 module" ON)
 option(SHARK_BUILD_IMAGE "Build the image module (OpenGL/JPEG/PNG)" ON)
 option(SHARK_BUILD_AUDIO "Build the audio module (opus/opusfile/mpg123/lame)" ON)
@@ -115,7 +115,8 @@ endfunction()
 
 # common, log, sync, async, math, str, legacy, toml and json only need the
 # standard library, so they are compiled into a single target.
-shark_add_module(common STATIC
+shark_add_module(
+        common STATIC
         SOURCES
         src/str.cpp
         src/legacy.cpp
@@ -129,13 +130,30 @@ shark_add_module(common STATIC
 # ========== ---------- ---------- ---------- ==========
 
 
-if(SHARK_BUILD_EXTERNAL)
-    find_package(Boost REQUIRED COMPONENTS json)
+if(SHARK_BUILD_NET)
+    find_package(Boost REQUIRED COMPONENTS json regex url)
+    find_package(OpenSSL REQUIRED)
+    find_package(Threads REQUIRED)
 
     # external.hpp exposes boost::json in its public API.
-    shark_add_module(external STATIC
-            SOURCES src/external.cpp
-            PUBLIC shark::common Boost::json
+    shark_add_module(
+            net STATIC
+            SOURCES
+            src/net/http.cpp
+            src/net/proxy.cpp
+            src/net/utils.cpp
+
+            PUBLIC
+            shark::common
+
+            Boost::json
+            Boost::regex
+            Boost::url
+
+            OpenSSL::SSL
+            OpenSSL::Crypto
+
+            Threads::Threads
     )
 endif()
 
@@ -164,7 +182,7 @@ if(SHARK_BUILD_IMAGE)
 
     # image.hpp includes <GL/gl.h> in its public API.
     shark_add_module(image STATIC
-            SOURCES src/image.cpp
+            SOURCES src/media/image.cpp
             PUBLIC OpenGL::GL
             PRIVATE JPEG::JPEG PNG::PNG
     )
@@ -180,7 +198,7 @@ if(SHARK_BUILD_AUDIO)
     find_library(LAME_LIBRARY NAMES mp3lame lame REQUIRED)
 
     shark_add_module(audio STATIC
-            SOURCES src/audio.cpp
+            SOURCES src/media/audio.cpp
             PRIVATE
             ${OPUSENC_LIBRARY} ${OPUSFILE_LIBRARY}
             ${MPG123_LIBRARY} ${LAME_LIBRARY}
@@ -203,3 +221,11 @@ add_library(shark::shark ALIAS shark)
 target_include_directories(shark INTERFACE ${SHARK_INCLUDE_DIR})
 target_compile_features(shark INTERFACE cxx_std_20)
 target_link_libraries(shark INTERFACE ${SHARK_MODULE_TARGETS})
+
+# ========== ---------- ---------- ---------- ==========
+#                          TEST
+# ========== ---------- ---------- ---------- ==========
+
+
+# Regression tests for the public core API.
+add_subdirectory(tests)

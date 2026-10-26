@@ -7,7 +7,7 @@
  * License: MIT
  */
 
-#include "shark/audio.hpp"
+#include "shark/media/audio.hpp"
 
 #include <algorithm>
 #include <array>

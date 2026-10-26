@@ -10,7 +10,7 @@
 #include <fstream>
 
 #include "shark/str.hpp"
-#include "shark/external.hpp"
+#include "shark/net/utils.hpp"
 
 
 boost::json::object shark::file::read_json(
@@ -26,6 +26,6 @@ void shark::file::dump_json(
 {
 	namespace json = boost::json;
 	std::string pretty = json::serialize(js);
-	
+
 	std::ofstream(std::string(path)) << pretty;
 }
