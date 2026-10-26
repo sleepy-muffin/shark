@@ -137,6 +137,13 @@ if(SHARK_BUILD_NET)
     find_package(OpenSSL REQUIRED)
     find_package(Threads REQUIRED)
 
+    # The TLS client loads the OS root store on Windows so HTTPS works without
+    # a bundled CA file. crypt32 backs the root-store calls in http.cpp.
+    set(SHARK_NET_PLATFORM_LIBRARIES)
+    if(WIN32)
+        list(APPEND SHARK_NET_PLATFORM_LIBRARIES crypt32)
+    endif()
+
     # external.hpp exposes boost::json in its public API.
     shark_add_module(
             net STATIC
@@ -156,6 +163,9 @@ if(SHARK_BUILD_NET)
             OpenSSL::Crypto
 
             Threads::Threads
+
+            PRIVATE
+            ${SHARK_NET_PLATFORM_LIBRARIES}
     )
 
 
@@ -225,12 +235,6 @@ add_library(shark::shark ALIAS shark)
 target_include_directories(shark INTERFACE ${SHARK_INCLUDE_DIR})
 # target_compile_features(shark INTERFACE cxx_std_20)
 target_link_libraries(shark INTERFACE ${SHARK_MODULE_TARGETS})
-
-# The TLS client loads the OS root store on Windows so HTTPS works without a
-# bundled CA file.
-if(WIN32)
-    target_link_libraries(${PROJECT_NAME} PRIVATE crypt32)
-endif()
 
 # ========== ---------- ---------- ---------- ==========
 #                          TEST
