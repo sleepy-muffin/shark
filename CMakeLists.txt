@@ -157,6 +157,8 @@ if(SHARK_BUILD_NET)
 
             Threads::Threads
     )
+
+
 endif()
 
 if(SHARK_BUILD_SQLITE3)
@@ -223,6 +225,12 @@ add_library(shark::shark ALIAS shark)
 target_include_directories(shark INTERFACE ${SHARK_INCLUDE_DIR})
 # target_compile_features(shark INTERFACE cxx_std_20)
 target_link_libraries(shark INTERFACE ${SHARK_MODULE_TARGETS})
+
+# The TLS client loads the OS root store on Windows so HTTPS works without a
+# bundled CA file.
+if(WIN32)
+    target_link_libraries(${PROJECT_NAME} PRIVATE crypt32)
+endif()
 
 # ========== ---------- ---------- ---------- ==========
 #                          TEST
