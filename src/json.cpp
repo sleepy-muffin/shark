@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <sstream>
 #include <stdexcept>
 
 #include "shark/str.hpp"

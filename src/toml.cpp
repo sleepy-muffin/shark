@@ -2,6 +2,7 @@
 
 #include <charconv>
 #include <fstream>
+#include <sstream>
 
 
 namespace {
