@@ -136,7 +136,7 @@ int main() {
       "http://127.0.0.1:" + std::to_string(server.port()) + "/search";
 
   // 1. No extra headers: the default agent is used.
-  const std::string first = shark::net::http_get_body(url, std::nullopt, 4096);
+  const std::string first = shark::net::http_get_body(url, std::nullopt, 4096).value();
   expect(first == "ok", "default request returns the body");
   expect_contains(
       server.request(0), "User-Agent: Mozilla/5.0 (compatible; local-notebook/1.0)",
@@ -147,7 +147,7 @@ int main() {
   const std::string second = shark::net::http_get_body(
       url, std::nullopt, 4096, std::stop_token{},
       {{"User-Agent", "BrowserTest/1.0"}, {"X-Test", "yes"}}
-  );
+  ).value();
   expect(second == "ok", "override request returns the body");
 
   const std::string request = server.request(1);
