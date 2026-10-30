@@ -716,6 +716,18 @@ int http_request(
     load_windows_root_certificates(ssl_context);
 #else
     ssl_context.set_default_verify_paths();
+
+    // A packaged app on Android has no usable default store, so the caller points
+    // SSL_CERT_FILE at a bundle it wrote. OpenSSL only consults that variable as
+    // part of the default paths, so load it explicitly too: verification must not
+    // depend on the variable having been read at the right moment.
+    if (const char* bundle = std::getenv("SSL_CERT_FILE")) {
+      try {
+        ssl_context.load_verify_file(bundle);
+      } catch (const std::exception&) {
+        // The default paths already tried; a bad bundle must not abort here.
+      }
+    }
 #endif
 
     beast::tcp_stream plain = connect_stream(
@@ -766,7 +778,15 @@ int http_request(
           .run([&] { return done; });
 
       if (error) {
-        throw std::runtime_error("TLS handshake failed: " + error.message());
+        // Name the verify result: `error.message()` only says the handshake failed,
+        // and on a device with no console the reason is otherwise unreadable.
+        const long verify = SSL_get_verify_result(tls.native_handle());
+
+        throw std::runtime_error(
+            "TLS handshake failed: " + error.message() + " (verify " +
+            std::to_string(verify) + ": " +
+            X509_verify_cert_error_string(verify) + ")"
+        );
       }
 
       status = do_request(
