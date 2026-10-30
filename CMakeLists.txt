@@ -51,8 +51,10 @@ set(SHARK_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF CACHE BOOL
+    "Scan C++ sources for module dependencies")
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Register a module as its own target, plus a shark::<name> alias.
 #

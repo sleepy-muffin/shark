@@ -17,6 +17,7 @@
 #include <boost/system/error_code.hpp>
 #include <boost/url.hpp>
 
+#include <expected>
 #include <openssl/ssl.h>
 
 #include <algorithm>
@@ -46,8 +47,6 @@
 #include <windows.h>
 #include <wincrypt.h>
 #endif
-
-namespace shark::net {
 
 namespace {
 
@@ -562,11 +561,13 @@ http::verb verb_for(std::string_view method) {
 template<typename Stream>
 int do_request(
     Stream& stream, const parsed_url& target, std::string_view method,
-    const std::vector<HttpHeader>& headers, const std::string& body,
+    const std::vector<shark::net::HttpHeader>& headers, const std::string& body,
     bool absolute_form, std::stop_token stop, int write_timeout_ms,
-    int read_timeout_ms, const ResponseHandler& on_response,
-    const BodyHandler& on_body, asio::io_context& ioc
+    int read_timeout_ms, const shark::net::ResponseHandler& on_response,
+    const shark::net::BodyHandler& on_body, asio::io_context& ioc
 ) {
+  using namespace shark::net;
+
   http::request<http::string_body> request;
   request.method(verb_for(method));
   request.target(absolute_form ? target.absolute_target() : target.target);
@@ -676,7 +677,7 @@ int do_request(
 
 } // namespace
 
-int http_request(
+int shark::net::http_request(
     std::string_view method, const std::string& url,
     const std::optional<std::string>& proxy_spec,
     const std::vector<HttpHeader>& headers, const std::string& body,
@@ -792,7 +793,7 @@ int http_request(
   }
 }
 
-std::string http_get_body(
+std::expected<std::string, shark::net::HttpStatus> shark::net::http_get_body(
     const std::string& url, const std::optional<std::string>& proxy, int max_bytes,
     std::stop_token stop, const std::vector<HttpHeader>& extra_headers
 ) {
@@ -842,10 +843,9 @@ std::string http_get_body(
   );
 
   if (status < 200 || status >= 300) {
-    throw std::runtime_error("HTTP request failed (HTTP " + std::to_string(status) + ")");
+    // throw std::runtime_error("HTTP request failed (HTTP " + std::to_string(status) + ")");
+    return std::unexpected(status);
   }
 
   return body;
-}
-
 }
