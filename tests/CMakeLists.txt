@@ -42,3 +42,21 @@ target_link_libraries(
 )
 
 add_test(NAME http-headers COMMAND http-headers-test)
+
+
+# ========== ---------- ---------- ---------- ==========
+#                          JSON
+# ========== ---------- ---------- ---------- ==========
+
+add_executable(
+  json-test
+  json_test.cpp
+)
+
+target_link_libraries(
+  json-test
+  PRIVATE
+    shark::common
+)
+
+add_test(NAME json COMMAND json-test)

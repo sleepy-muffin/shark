@@ -1,5 +1,6 @@
 #pragma once
 
+#include <expected>
 #include <cstddef>
 #include <functional>
 #include <optional>
@@ -53,11 +54,13 @@ int http_request(
     int read_timeout_ms = 0
 );
 
+using HttpStatus = int;
+
 // A GET that follows redirects and returns at most `max_bytes` of the body.
 // Throws when the final status is not 2xx. `extra_headers` are merged over the
 // defaults (a header with the same name replaces the default), which lets a
 // caller present a browser User-Agent to sites that reject non-browser clients.
-std::string http_get_body(
+[[nodiscard]] std::expected<std::string, HttpStatus> http_get_body(
     const std::string& url,
     const std::optional<std::string>& proxy,
     int max_bytes,
