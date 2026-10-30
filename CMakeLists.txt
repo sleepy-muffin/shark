@@ -8,11 +8,13 @@ project(shark CXX)
 # ========== ---------- ---------- ---------- ==========
 
 
-# Platform string
+# Platform string. Android sets UNIX as well, so it has to be tested first.
 if(WIN32)
     set(PLATFORM "windows")
 elseif(APPLE)
     set(PLATFORM "macos")
+elseif(ANDROID)
+    set(PLATFORM "android")
 elseif(UNIX)
     set(PLATFORM "linux")
 else()

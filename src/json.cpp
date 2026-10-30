@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <iterator>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>

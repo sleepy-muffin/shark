@@ -9,6 +9,7 @@
 
 #include "shark/str.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 #include "shark/log.hpp"
